@@ -611,6 +611,8 @@ The run continues after ordinary mutation and evaluation failures. It stops only
 - The seed cannot produce a valid initial parent.
 - Persistent archive corruption is detected.
 - Required project files disappear or change incompatibly.
+- A configured target score is reached.
+- A configured patience window is exhausted without a new objective-best record.
 - The user interrupts the process.
 - An unrecoverable internal engine invariant fails.
 
@@ -755,6 +757,20 @@ The line budget is a complexity budget, not an invitation to compress readable c
 - Simplified MAP-Elites.
 - User-provided feature coordinates.
 - Optional islands and migration.
+
+### v0.5: Target-aware stopping
+
+- Persisted target score.
+- Seed and resume pre-checks.
+- Explicit target events.
+- Deterministic parallel batch boundaries.
+
+### v0.6: Stagnation-aware stopping
+
+- Persisted patience window.
+- Failed generations count as non-improving attempts.
+- Resume-time stagnation pre-checks.
+- Deterministic parallel batch-boundary decisions.
 
 Each stage must respond to observed limitations in real use. Features are not added solely to claim parity with OpenEvolve.
 

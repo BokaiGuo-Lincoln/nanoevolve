@@ -296,6 +296,7 @@ def _normalized_options(
     islands: int,
     migration_interval: int,
     target_score: float | None,
+    patience: int | None,
 ) -> dict[str, object]:
     if mutation_mode not in {"full", "search_replace", "evolve_blocks"}:
         raise ValueError(f"unknown mutation mode: {mutation_mode}")
@@ -315,6 +316,10 @@ def _normalized_options(
         target_score = float(target_score)
         if not math.isfinite(target_score):
             raise ValueError("target_score must be finite")
+    if patience is not None and (
+        isinstance(patience, bool) or not isinstance(patience, int) or patience <= 0
+    ):
+        raise ValueError("patience must be a positive integer")
     if any(name not in feature_bins for name in features):
         raise ValueError("every feature requires a bin width")
     if any(feature_bins[name] <= 0 for name in features):
@@ -338,6 +343,7 @@ def _normalized_options(
         "islands": islands,
         "migration_interval": migration_interval,
         "target_score": target_score,
+        "patience": patience,
     }
 
 
@@ -355,6 +361,7 @@ def _validate_resume(archive: Archive, expected: Mapping[str, object]) -> None:
         "islands": 1,
         "migration_interval": 0,
         "target_score": None,
+        "patience": None,
     }
     mismatches = [
         name
@@ -424,6 +431,7 @@ def evolve(
     islands: int = 1,
     migration_interval: int = 0,
     target_score: float | None = None,
+    patience: int | None = None,
 ) -> Record:
     if iterations < 0:
         raise ValueError("iterations must be non-negative")
@@ -445,8 +453,10 @@ def evolve(
         islands=islands,
         migration_interval=migration_interval,
         target_score=target_score,
+        patience=patience,
     )
     target_score = options["target_score"]
+    patience = options["patience"]
     seed_path = Path(seed).resolve()
     seed_workspace = read_workspace(seed_path)
     multi_file = seed_path.is_dir()
@@ -540,7 +550,21 @@ def evolve(
             )
             return archive.best(objectives)
 
-    current = max((record.generation for record in archive.records), default=-1) + 1
+    last_generation = archive.records[-1].generation
+    if patience is not None:
+        best = archive.best(objectives)
+        if last_generation - best.generation >= patience:
+            _emit(
+                on_event,
+                "patience_exhausted",
+                last_generation,
+                best.id,
+                patience=patience,
+                last_improvement_generation=best.generation,
+            )
+            return best
+
+    current = last_generation + 1
     while current <= iterations:
         generations = list(range(max(1, current), min(iterations + 1, current + workers)))
         prepared: dict[int, tuple[Record, str, int, int, str, str | None, dict[str, str] | None]] = {}
@@ -715,5 +739,17 @@ def evolve(
         current = generations[-1] + 1
         if batch_reached_target:
             break
+        if patience is not None:
+            best = archive.best(objectives)
+            if generations[-1] - best.generation >= patience:
+                _emit(
+                    on_event,
+                    "patience_exhausted",
+                    generations[-1],
+                    best.id,
+                    patience=patience,
+                    last_improvement_generation=best.generation,
+                )
+                break
 
     return archive.best(objectives)

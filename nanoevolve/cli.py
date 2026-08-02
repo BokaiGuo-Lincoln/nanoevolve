@@ -58,6 +58,7 @@ def _add_evolution_arguments(parser: argparse.ArgumentParser, *, resume: bool) -
     default = None if resume else argparse.SUPPRESS
     parser.add_argument("--json-events", action="store_true")
     parser.add_argument("--target-score", type=float, default=None)
+    parser.add_argument("--patience", type=int, default=None)
     parser.add_argument(
         "--mutation-mode",
         choices=("full", "search_replace", "evolve_blocks"),
@@ -130,6 +131,7 @@ def _evolution_options(
         "islands": value("islands", 1),
         "migration_interval": value("migration_interval", 0),
         "target_score": value("target_score", None),
+        "patience": value("patience", None),
     }
 
 
@@ -164,6 +166,13 @@ def _render_event(event: EvolutionEvent) -> None:
         print(
             f"generation {event.generation}: target score "
             f"{event.data.get('target_score')} reached with {event.data.get('score')}",
+            file=sys.stderr,
+        )
+    elif event.type == "patience_exhausted":
+        print(
+            f"generation {event.generation}: patience {event.data.get('patience')} "
+            f"exhausted; last improvement at generation "
+            f"{event.data.get('last_improvement_generation')}",
             file=sys.stderr,
         )
 

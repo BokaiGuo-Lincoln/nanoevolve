@@ -11,7 +11,7 @@ Preserve AlphaEvolve's generate–verify–select feedback loop, remove OpenEvol
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-stdlib_unittest-4C1)
-![Status](https://img.shields.io/badge/status-v0.5_target_stopping-2E8B57)
+![Status](https://img.shields.io/badge/status-v0.6_stagnation_stopping-2E8B57)
 ![State](https://img.shields.io/badge/state-append--only_JSONL-6E56CF)
 
 </div>
@@ -91,7 +91,8 @@ export NANOEVOLVE_API_KEY="..."
 nanoevolve run my-experiment \
   --iterations 100 \
   --random-seed 42 \
-  --target-score 0.95
+  --target-score 0.95 \
+  --patience 12
 ```
 
 Resume to a total generation target:
@@ -103,6 +104,8 @@ nanoevolve resume my-experiment --iterations 200
 `resume --iterations 200` means “reach generation 200,” not “run 200 more attempts.” Repeating it after generation 200 performs no additional model calls.
 
 `--target-score` stops before the next generation batch once any successful candidate reaches the requested score. The target is stored in `run.json` and reused by `resume`. With `workers > 1`, already-started candidates in the current batch are still evaluated and committed before the run stops.
+
+`--patience N` stops when `N` consecutive generations produce no new objective-best record. Failed generations count toward patience because they still consume an attempt. The setting is persisted for resume, and parallel runs decide only after the current batch is committed.
 
 ## Minimal Python API
 
@@ -123,6 +126,7 @@ best = evolve(
     task="TASK.md",
     iterations=100,
     target_score=0.95,
+    patience=12,
 )
 
 print(best.evaluation.score)
@@ -190,7 +194,8 @@ nanoevolve run my-experiment \
   --feature-bin size=100 \
   --islands 4 \
   --migration-interval 20 \
-  --target-score 0.95
+  --target-score 0.95 \
+  --patience 12
 ```
 
 - Use a `seed/` directory instead of `seed.py` for multi-file workspaces; evaluators receive the workspace directory path.
@@ -200,6 +205,7 @@ nanoevolve run my-experiment \
 - SQLite changes only the record index. Prompts, responses, workspaces, outputs, and evaluations remain ordinary hashed files.
 - Feature metrics plus bins activate simplified MAP-Elites. Islands select locally and widen the pool on migration generations.
 - `target_score` / `--target-score` stops model calls at the next batch boundary and emits a visible `target_reached` event.
+- `patience` / `--patience` stops stagnant runs at the next batch boundary and emits a visible `patience_exhausted` event.
 
 Run the deterministic combined showcase without an API key or network access:
 
@@ -337,7 +343,14 @@ The default evaluator subprocess removes environment variables whose names conta
 - [x] Explicit `target_reached` events
 - [x] Deterministic parallel batch-boundary semantics
 
-The published v0.2-v0.5 roadmap is implemented. Future features still require concrete evidence from real runs; parity with a larger framework is not a goal.
+### v0.6 — Stagnation-aware stopping
+
+- [x] Persisted patience for Python and CLI runs
+- [x] Failed generations count as non-improving attempts
+- [x] Resume pre-checks with zero unnecessary model calls
+- [x] Parallel batch-boundary decisions without premature stopping
+
+The published v0.2-v0.6 roadmap is implemented. Future features still require concrete evidence from real runs; parity with a larger framework is not a goal.
 
 ## Development
 

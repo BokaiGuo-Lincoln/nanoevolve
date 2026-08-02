@@ -11,7 +11,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-stdlib_unittest-4C1)
-![Status](https://img.shields.io/badge/status-v0.5_target_stopping-2E8B57)
+![Status](https://img.shields.io/badge/status-v0.6_stagnation_stopping-2E8B57)
 ![State](https://img.shields.io/badge/state-append--only_JSONL-6E56CF)
 
 </div>
@@ -91,7 +91,8 @@ export NANOEVOLVE_API_KEY="..."
 nanoevolve run my-experiment \
   --iterations 100 \
   --random-seed 42 \
-  --target-score 0.95
+  --target-score 0.95 \
+  --patience 12
 ```
 
 恢复到指定总代数：
@@ -103,6 +104,8 @@ nanoevolve resume my-experiment --iterations 200
 `resume --iterations 200` 表示“推进到 generation 200”，不是“额外执行 200 次”。达到 200 代后重复执行不会再次调用模型。
 
 `--target-score` 会在任意成功候选达到目标分数后，于下一个 generation batch 开始前停止。目标值会写入 `run.json` 并由 `resume` 自动复用。使用 `workers > 1` 时，当前 batch 中已经启动的候选仍会完成评估和提交。
+
+`--patience N` 会在连续 `N` 个 generation 都没有产生新的 objective-best record 时停止。失败代仍然消耗一次尝试，因此会计入 patience。该设置会持久化并由 resume 复用；并行运行只会在当前 batch 完整提交后作出停止判断。
 
 ## 最小 Python API
 
@@ -123,6 +126,7 @@ best = evolve(
     task="TASK.md",
     iterations=100,
     target_score=0.95,
+    patience=12,
 )
 
 print(best.evaluation.score)
@@ -190,7 +194,8 @@ nanoevolve run my-experiment \
   --feature-bin size=100 \
   --islands 4 \
   --migration-interval 20 \
-  --target-score 0.95
+  --target-score 0.95 \
+  --patience 12
 ```
 
 - 用 `seed/` 目录替代 `seed.py` 即可启用多文件 workspace；evaluator 会收到 workspace 目录路径。
@@ -200,6 +205,7 @@ nanoevolve run my-experiment \
 - SQLite 只替换 record index；prompt、响应、workspace、输出和评估仍是普通的哈希文件。
 - Feature metrics 与 bins 启用简化 MAP-Elites；islands 默认本地选择，并在 migration generation 扩大候选池。
 - `target_score` / `--target-score` 会在下一个 batch 边界停止模型调用，并发出可观察的 `target_reached` 事件。
+- `patience` / `--patience` 会在下一个 batch 边界停止停滞运行，并发出可观察的 `patience_exhausted` 事件。
 
 无需 API key 或网络即可运行确定性组合示例：
 
@@ -337,7 +343,14 @@ flowchart LR
 - [x] 显式 `target_reached` 事件
 - [x] 确定性的并行 batch 边界语义
 
-已发布的 v0.2-v0.5 路线图现已全部实现。未来能力仍需由真实运行中的明确需求驱动；“功能对齐更大的框架”不是目标。
+### v0.6 — 停滞感知停止
+
+- [x] Python 与 CLI 运行共享持久化 patience
+- [x] 失败代计入未改进尝试
+- [x] Resume 预检查，避免多余模型调用
+- [x] 并行 batch 边界决策，不提前误停
+
+已发布的 v0.2-v0.6 路线图现已全部实现。未来能力仍需由真实运行中的明确需求驱动；“功能对齐更大的框架”不是目标。
 
 ## 开发与验证
 

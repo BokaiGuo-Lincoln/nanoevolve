@@ -143,6 +143,72 @@ class EvolutionEngineTests(unittest.TestCase):
                 target_score=float("nan"),
             )
 
+    def test_patience_stops_after_consecutive_non_improvements(self):
+        events: list[EvolutionEvent] = []
+        model = SequenceModel([code(1), code(0), code(0)])
+
+        best = self.run_evolve(
+            model,
+            10,
+            patience=2,
+            on_event=events.append,
+        )
+
+        self.assertEqual(best.evaluation.score, 1.0)
+        self.assertEqual(len(model.prompts), 3)
+        self.assertEqual(
+            [record.generation for record in Archive.open(self.workdir).records],
+            [0, 1, 2, 3],
+        )
+        exhausted = [event for event in events if event.type == "patience_exhausted"]
+        self.assertEqual([event.generation for event in exhausted], [3])
+        self.assertEqual(exhausted[0].data["last_improvement_generation"], 1)
+
+    def test_patience_resume_precheck_skips_model_calls(self):
+        self.run_evolve(
+            SequenceModel([code(1), "invalid", "invalid"]),
+            10,
+            patience=2,
+        )
+
+        events: list[EvolutionEvent] = []
+        best = self.run_evolve(
+            SequenceModel([]),
+            20,
+            patience=2,
+            on_event=events.append,
+        )
+
+        self.assertEqual(best.evaluation.score, 1.0)
+        exhausted = [event for event in events if event.type == "patience_exhausted"]
+        self.assertEqual([event.generation for event in exhausted], [3])
+
+    def test_patience_waits_for_the_parallel_batch_boundary(self):
+        events: list[EvolutionEvent] = []
+        model = SequenceModel([code(0), code(1), code(0), code(0)])
+
+        best = self.run_evolve(
+            model,
+            10,
+            patience=1,
+            workers=2,
+            on_event=events.append,
+        )
+
+        self.assertEqual(best.evaluation.score, 1.0)
+        self.assertEqual(len(model.prompts), 4)
+        exhausted = [event for event in events if event.type == "patience_exhausted"]
+        self.assertEqual([event.generation for event in exhausted], [4])
+        self.assertEqual(exhausted[0].data["last_improvement_generation"], 2)
+
+    def test_patience_must_be_a_positive_integer(self):
+        for value in (0, -1, True, 1.5):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(
+                    (TypeError, ValueError), "patience must be a positive integer"
+                ):
+                    self.run_evolve(SequenceModel([]), 1, patience=value)
+
     def test_failed_mutation_consumes_generation_and_later_run_continues(self):
         model = SequenceModel(["not a code block", code(2)])
 

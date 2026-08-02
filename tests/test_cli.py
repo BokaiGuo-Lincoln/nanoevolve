@@ -311,6 +311,44 @@ class CliTests(unittest.TestCase):
         self.assertEqual(resumed[0], 0, resumed[2])
         self.assertEqual(len(_SequenceHandler.requests), 1)
 
+    def test_run_and_resume_reuse_patience(self):
+        _SequenceHandler.responses = [
+            "```python\nSCORE = 1\n```",
+            "not code",
+            "not code",
+        ]
+
+        first = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "10",
+            "--patience",
+            "2",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(first[0], 0, first[2])
+        self.assertIn("patience 2 exhausted", first[2])
+        self.assertEqual(len(_SequenceHandler.requests), 3)
+        archive = Archive.open(self.project / ".nanoevolve")
+        self.assertEqual(archive.metadata["patience"], 2)
+        self.assertEqual(
+            [record.generation for record in archive.records],
+            [0, 1, 2, 3],
+        )
+
+        resumed = self.invoke(
+            "resume",
+            str(self.project),
+            "--iterations",
+            "20",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(resumed[0], 0, resumed[2])
+        self.assertEqual(len(_SequenceHandler.requests), 3)
+
     def test_reports_missing_project_files(self):
         (self.project / "TASK.md").unlink()
 

@@ -23,7 +23,7 @@ CORE_FILES = (
     "nanoevolve/runner.py",
     "nanoevolve/engine.py",
 )
-CORE_LINE_BUDGET = 1900
+CORE_LINE_BUDGET = 1950
 FORBIDDEN_PATTERNS = (
     re.compile(r"\bTODO\b"),
     re.compile(r"\bFIXME\b"),

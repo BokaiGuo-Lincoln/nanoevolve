@@ -4,6 +4,18 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.6.0] - 2026-08-02
+
+### Added
+
+- Persisted `patience` / `--patience` stopping after consecutive non-improving generations, including failed attempts.
+- Resume-time stagnation pre-checks and deterministic parallel batch-boundary decisions.
+- Explicit `patience_exhausted` events in human-readable and JSON Lines streams.
+
+### Changed
+
+- Raised the explicit core complexity budget from 1,900 to 1,950 lines for stagnation-aware stopping.
+
 ## [0.5.0] - 2026-08-02
 
 ### Added
