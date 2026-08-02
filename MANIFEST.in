@@ -6,6 +6,7 @@ include SECURITY.md
 include pyproject.toml
 recursive-include docs *.md
 recursive-include examples *.md *.py
+include examples/roadmap_showcase/demo.py
 recursive-include scripts *.py
 recursive-include tests *.py
 recursive-include tasks *.md

@@ -47,6 +47,7 @@ class PackagingMetadataTests(unittest.TestCase):
             "SECURITY.md",
             "recursive-include docs",
             "recursive-include examples",
+            "examples/roadmap_showcase/demo.py",
             "recursive-include scripts",
             "recursive-include tests",
             "recursive-include tasks",

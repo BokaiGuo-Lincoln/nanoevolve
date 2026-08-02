@@ -167,6 +167,14 @@ nanoevolve run my-experiment \
 - SQLite changes only the record index. Prompts, responses, workspaces, outputs, and evaluations remain ordinary hashed files.
 - Feature metrics plus bins activate simplified MAP-Elites. Islands select locally and widen the pool on migration generations.
 
+Run the deterministic combined showcase without an API key or network access:
+
+```bash
+python examples/roadmap_showcase/demo.py
+```
+
+It exercises the multi-file, SEARCH/REPLACE, inspiration, artifact feedback, parallel evaluator, SQLite, multi-objective, MAP-Elites, island, and migration paths in one inspectable run.
+
 ## Version and Release Verification
 
 The installed console script and module entry point share the same parser and version source:

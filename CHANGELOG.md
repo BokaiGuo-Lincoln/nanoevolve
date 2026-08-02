@@ -4,6 +4,13 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.4.1] - 2026-08-02
+
+### Added
+
+- Deterministic `roadmap_showcase` combining multi-file workspaces, SEARCH/REPLACE, inspiration context, artifact feedback, parallel evaluators, SQLite, multi-objective selection, MAP-Elites, islands, and migration.
+- Cross-platform and clean-wheel CI smoke coverage for the combined advanced path.
+
 ## [0.4.0] - 2026-08-02
 
 ### Added

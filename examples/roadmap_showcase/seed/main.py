@@ -1,0 +1,2 @@
+BASE = 1
+BONUS = 0

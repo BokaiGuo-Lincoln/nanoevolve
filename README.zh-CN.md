@@ -167,6 +167,14 @@ nanoevolve run my-experiment \
 - SQLite 只替换 record index；prompt、响应、workspace、输出和评估仍是普通的哈希文件。
 - Feature metrics 与 bins 启用简化 MAP-Elites；islands 默认本地选择，并在 migration generation 扩大候选池。
 
+无需 API key 或网络即可运行确定性组合示例：
+
+```bash
+python examples/roadmap_showcase/demo.py
+```
+
+该示例会在同一次可检查运行中覆盖多文件、SEARCH/REPLACE、inspiration、artifact feedback、并行 evaluator、SQLite、多目标、MAP-Elites、islands 和 migration 路径。
+
 ## 版本与发布验证
 
 安装后的 console script 与模块入口共享同一套 parser 和版本来源：

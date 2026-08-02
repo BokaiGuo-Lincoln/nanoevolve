@@ -60,6 +60,7 @@ class WorkflowTests(unittest.TestCase):
             "python -m build",
             "python -m nanoevolve --version",
             "examples/hello_evolve/demo.py",
+            "examples/roadmap_showcase/demo.py",
         ):
             self.assertIn(required, workflow)
 

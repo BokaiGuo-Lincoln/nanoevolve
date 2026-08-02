@@ -1,0 +1,3 @@
+SCALE = 1
+OFFSET = 0
+LIMIT = 1
