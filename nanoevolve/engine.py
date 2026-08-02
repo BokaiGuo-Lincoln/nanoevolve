@@ -295,6 +295,7 @@ def _normalized_options(
     feature_bins: Mapping[str, float],
     islands: int,
     migration_interval: int,
+    target_score: float | None,
 ) -> dict[str, object]:
     if mutation_mode not in {"full", "search_replace", "evolve_blocks"}:
         raise ValueError(f"unknown mutation mode: {mutation_mode}")
@@ -308,6 +309,12 @@ def _normalized_options(
         raise ValueError("islands must be positive")
     if migration_interval < 0:
         raise ValueError("migration_interval must be non-negative")
+    if target_score is not None:
+        if isinstance(target_score, bool) or not isinstance(target_score, (int, float)):
+            raise TypeError("target_score must be a finite number")
+        target_score = float(target_score)
+        if not math.isfinite(target_score):
+            raise ValueError("target_score must be finite")
     if any(name not in feature_bins for name in features):
         raise ValueError("every feature requires a bin width")
     if any(feature_bins[name] <= 0 for name in features):
@@ -330,6 +337,7 @@ def _normalized_options(
         "feature_bins": dict(feature_bins),
         "islands": islands,
         "migration_interval": migration_interval,
+        "target_score": target_score,
     }
 
 
@@ -346,6 +354,7 @@ def _validate_resume(archive: Archive, expected: Mapping[str, object]) -> None:
         "feature_bins": {},
         "islands": 1,
         "migration_interval": 0,
+        "target_score": None,
     }
     mismatches = [
         name
@@ -414,6 +423,7 @@ def evolve(
     feature_bins: Mapping[str, float] | None = None,
     islands: int = 1,
     migration_interval: int = 0,
+    target_score: float | None = None,
 ) -> Record:
     if iterations < 0:
         raise ValueError("iterations must be non-negative")
@@ -434,7 +444,9 @@ def evolve(
         feature_bins=bins,
         islands=islands,
         migration_interval=migration_interval,
+        target_score=target_score,
     )
+    target_score = options["target_score"]
     seed_path = Path(seed).resolve()
     seed_workspace = read_workspace(seed_path)
     multi_file = seed_path.is_dir()
@@ -506,6 +518,27 @@ def evolve(
                 f"seed evaluation failed with status {seed_record.status}: {seed_record.error}"
             )
         _emit(on_event, "new_best", 0, seed_record.id, score=seed_record.evaluation.score)
+
+    if target_score is not None:
+        reached = next(
+            (
+                record
+                for record in archive.records
+                if record.status == "success"
+                and record.evaluation.score >= target_score
+            ),
+            None,
+        )
+        if reached is not None:
+            _emit(
+                on_event,
+                "target_reached",
+                reached.generation,
+                reached.id,
+                score=reached.evaluation.score,
+                target_score=target_score,
+            )
+            return archive.best(objectives)
 
     current = max((record.generation for record in archive.records), default=-1) + 1
     while current <= iterations:
@@ -592,6 +625,7 @@ def evolve(
                 )
 
         futures: dict[int, Future[RunnerResult]] = {}
+        batch_reached_target = False
         with ThreadPoolExecutor(max_workers=workers) as executor:
             for generation, item in prepared.items():
                 candidate = item[6]
@@ -663,6 +697,23 @@ def evolve(
                         committed.id,
                         score=committed.evaluation.score,
                     )
+                if (
+                    not batch_reached_target
+                    and target_score is not None
+                    and committed.status == "success"
+                    and committed.evaluation.score >= target_score
+                ):
+                    batch_reached_target = True
+                    _emit(
+                        on_event,
+                        "target_reached",
+                        generation,
+                        committed.id,
+                        score=committed.evaluation.score,
+                        target_score=target_score,
+                    )
         current = generations[-1] + 1
+        if batch_reached_target:
+            break
 
     return archive.best(objectives)

@@ -4,6 +4,14 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.5.0] - 2026-08-02
+
+### Added
+
+- Persisted `target_score` / `--target-score` stopping for seed evaluation, resumed runs, sequential generations, and deterministic parallel batches.
+- Explicit `target_reached` events in both human-readable and JSON Lines event streams.
+- Clean-wheel execution of the complete CLI integration suite.
+
 ## [0.4.4] - 2026-08-02
 
 ### Added

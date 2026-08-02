@@ -57,6 +57,7 @@ def _add_model_arguments(parser: argparse.ArgumentParser) -> None:
 def _add_evolution_arguments(parser: argparse.ArgumentParser, *, resume: bool) -> None:
     default = None if resume else argparse.SUPPRESS
     parser.add_argument("--json-events", action="store_true")
+    parser.add_argument("--target-score", type=float, default=None)
     parser.add_argument(
         "--mutation-mode",
         choices=("full", "search_replace", "evolve_blocks"),
@@ -128,6 +129,7 @@ def _evolution_options(
         "feature_bins": bins,
         "islands": value("islands", 1),
         "migration_interval": value("migration_interval", 0),
+        "target_score": value("target_score", None),
     }
 
 
@@ -156,6 +158,12 @@ def _render_event(event: EvolutionEvent) -> None:
     elif event.type == "new_best":
         print(
             f"generation {event.generation}: new best {event.data.get('score')}",
+            file=sys.stderr,
+        )
+    elif event.type == "target_reached":
+        print(
+            f"generation {event.generation}: target score "
+            f"{event.data.get('target_score')} reached with {event.data.get('score')}",
             file=sys.stderr,
         )
 

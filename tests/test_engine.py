@@ -75,6 +75,74 @@ class EvolutionEngineTests(unittest.TestCase):
         self.assertIn("SCORE = 0", model.prompts[0])
         self.assertTrue(any(event.type == "new_best" for event in events))
 
+    def test_target_score_skips_model_when_seed_already_satisfies_it(self):
+        events: list[EvolutionEvent] = []
+        model = SequenceModel([])
+
+        best = self.run_evolve(
+            model,
+            10,
+            target_score=0,
+            on_event=events.append,
+        )
+
+        self.assertEqual(best.evaluation.score, 0.0)
+        self.assertEqual(model.prompts, [])
+        self.assertEqual(len(Archive.open(self.workdir).records), 1)
+        reached = [event for event in events if event.type == "target_reached"]
+        self.assertEqual(len(reached), 1)
+        self.assertEqual(reached[0].generation, 0)
+        self.assertEqual(reached[0].data["target_score"], 0.0)
+
+    def test_target_score_stops_at_the_first_reaching_generation(self):
+        events: list[EvolutionEvent] = []
+        model = SequenceModel([code(1), code(2)])
+
+        best = self.run_evolve(
+            model,
+            10,
+            target_score=2,
+            on_event=events.append,
+        )
+
+        self.assertEqual(best.evaluation.score, 2.0)
+        self.assertEqual(len(model.prompts), 2)
+        self.assertEqual(
+            [record.generation for record in Archive.open(self.workdir).records],
+            [0, 1, 2],
+        )
+        reached = [event for event in events if event.type == "target_reached"]
+        self.assertEqual([event.generation for event in reached], [2])
+
+    def test_target_score_finishes_the_current_parallel_batch(self):
+        events: list[EvolutionEvent] = []
+        model = SequenceModel([code(1), code(2)])
+
+        best = self.run_evolve(
+            model,
+            10,
+            target_score=1,
+            workers=2,
+            on_event=events.append,
+        )
+
+        self.assertEqual(best.evaluation.score, 2.0)
+        self.assertEqual(len(model.prompts), 2)
+        self.assertEqual(
+            [record.generation for record in Archive.open(self.workdir).records],
+            [0, 1, 2],
+        )
+        reached = [event for event in events if event.type == "target_reached"]
+        self.assertEqual([event.generation for event in reached], [1])
+
+    def test_target_score_must_be_finite(self):
+        with self.assertRaisesRegex(ValueError, "target_score must be finite"):
+            self.run_evolve(
+                SequenceModel([]),
+                1,
+                target_score=float("nan"),
+            )
+
     def test_failed_mutation_consumes_generation_and_later_run_continues(self):
         model = SequenceModel(["not a code block", code(2)])
 

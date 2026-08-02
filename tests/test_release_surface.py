@@ -27,6 +27,12 @@ class ReleaseCheckTests(unittest.TestCase):
             readme = (ROOT / filename).read_text(encoding="utf-8")
             self.assertIn("--artifact prompt", readme)
 
+    def test_readmes_surface_target_score_stopping(self):
+        for filename in ("README.md", "README.zh-CN.md"):
+            readme = (ROOT / filename).read_text(encoding="utf-8")
+            self.assertIn("--target-score", readme)
+            self.assertIn("status-v0.5_target_stopping", readme)
+
     def test_current_repository_passes_static_checks(self):
         self.assertEqual(collect_static_failures(ROOT), [])
 
@@ -77,6 +83,7 @@ class WorkflowTests(unittest.TestCase):
             "python -m nanoevolve --version",
             "python -m nanoevolve run --help",
             "python -m nanoevolve inspect --help",
+            ".release-venv/bin/python tests/test_cli.py",
             "examples/hello_evolve/demo.py",
             "examples/circle_packing/demo.py",
             "examples/roadmap_showcase/demo.py",

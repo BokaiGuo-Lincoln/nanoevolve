@@ -280,6 +280,37 @@ class CliTests(unittest.TestCase):
         self.assertEqual(repeated[0], 0, repeated[2])
         self.assertEqual(len(_SequenceHandler.requests), 2)
 
+    def test_run_and_resume_reuse_target_score(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 1\n```"]
+
+        first = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "10",
+            "--target-score",
+            "1",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(first[0], 0, first[2])
+        self.assertIn("target score 1.0 reached", first[2])
+        self.assertEqual(len(_SequenceHandler.requests), 1)
+        archive = Archive.open(self.project / ".nanoevolve")
+        self.assertEqual(archive.metadata["target_score"], 1.0)
+        self.assertEqual([record.generation for record in archive.records], [0, 1])
+
+        resumed = self.invoke(
+            "resume",
+            str(self.project),
+            "--iterations",
+            "20",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(resumed[0], 0, resumed[2])
+        self.assertEqual(len(_SequenceHandler.requests), 1)
+
     def test_reports_missing_project_files(self):
         (self.project / "TASK.md").unlink()
 

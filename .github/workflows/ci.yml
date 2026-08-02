@@ -112,6 +112,7 @@ jobs:
       - name: Run installed demo and CLI smoke
         shell: bash
         run: |
+          .release-venv/bin/python tests/test_cli.py
           output=$(.release-venv/bin/python examples/hello_evolve/demo.py)
           echo "$output"
           project=$(echo "$output" | sed -n 's/^Project: //p')
