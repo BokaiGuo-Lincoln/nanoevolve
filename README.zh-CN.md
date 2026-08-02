@@ -4,7 +4,7 @@
 
 **能够成立的最小程序进化闭环。**
 
-把 LLM 当作 mutation operator；选择、评估、状态和停止条件始终由确定性程序控制。
+保留 AlphaEvolve 的“生成—验证—选择”反馈循环，删除 OpenEvolve 的研究基础设施，用 Pi 的原语化、文件化和完全可观察原则重新实现。
 
 [English](README.md) · [设计规范](docs/superpowers/specs/2026-08-02-nanoevolve-design.md) · [变更日志](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
 

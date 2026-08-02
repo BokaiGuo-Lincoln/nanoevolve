@@ -4,7 +4,7 @@
 
 **The smallest useful evolutionary programming loop.**
 
-Treat an LLM as a mutation operator. Keep selection, evaluation, state, and stopping under deterministic program control.
+Preserve AlphaEvolve's generate–verify–select feedback loop, remove OpenEvolve's research infrastructure, and rebuild it around Pi's primitives-first, file-based, fully observable philosophy.
 
 [简体中文](README.zh-CN.md) · [Design specification](docs/superpowers/specs/2026-08-02-nanoevolve-design.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
