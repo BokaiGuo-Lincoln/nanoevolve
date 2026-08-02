@@ -11,6 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseCheckTests(unittest.TestCase):
+    def test_readmes_surface_the_circle_packing_benchmark(self):
+        for filename in ("README.md", "README.zh-CN.md"):
+            readme = (ROOT / filename).read_text(encoding="utf-8")
+            self.assertIn("python examples/circle_packing/demo.py", readme)
+
     def test_current_repository_passes_static_checks(self):
         self.assertEqual(collect_static_failures(ROOT), [])
 
@@ -60,6 +65,7 @@ class WorkflowTests(unittest.TestCase):
             "python -m build",
             "python -m nanoevolve --version",
             "examples/hello_evolve/demo.py",
+            "examples/circle_packing/demo.py",
             "examples/roadmap_showcase/demo.py",
         ):
             self.assertIn(required, workflow)

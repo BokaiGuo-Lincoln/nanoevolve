@@ -10,7 +10,44 @@ from nanoevolve.archive import Archive
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class RoadmapShowcaseTests(unittest.TestCase):
+class ExampleIntegrationTests(unittest.TestCase):
+    def test_circle_packing_benchmark_improves_the_seed(self):
+        completed = subprocess.run(
+            [sys.executable, "examples/circle_packing/demo.py"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "PYTHONPATH": str(ROOT)
+                + os.pathsep
+                + os.environ.get("PYTHONPATH", ""),
+            },
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn(
+            "NanoEvolve circle-packing benchmark completed.", completed.stdout
+        )
+        project_line = next(
+            line for line in completed.stdout.splitlines() if line.startswith("Project: ")
+        )
+        project = Path(project_line.removeprefix("Project: "))
+        archive = Archive.open(project / ".nanoevolve")
+        scores = [
+            record.evaluation.score
+            for record in archive.successful_records()
+            if record.evaluation is not None
+        ]
+        self.assertEqual(len(archive.records), 4)
+        self.assertEqual(len(scores), 4)
+        self.assertAlmostEqual(scores[0], 0.4)
+        self.assertTrue(
+            all(left < right for left, right in zip(scores, scores[1:]))
+        )
+        self.assertAlmostEqual(max(scores), 0.5176380902, places=8)
+
     def test_advanced_showcase_runs_combined_features_without_network(self):
         cache_dir = ROOT / "examples" / "roadmap_showcase" / "seed" / "__pycache__"
         cache_dir.mkdir(exist_ok=True)

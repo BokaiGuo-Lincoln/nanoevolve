@@ -4,6 +4,13 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.4.2] - 2026-08-02
+
+### Added
+
+- Reproducible, no-network eight-point circle-packing benchmark with an inspectable score trajectory from `0.4000000000` to `0.5176380902`.
+- Cross-platform and clean-wheel CI coverage for the benchmark path.
+
 ## [0.4.1] - 2026-08-02
 
 ### Added

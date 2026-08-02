@@ -60,6 +60,16 @@ nanoevolve best /tmp/nanoevolve-hello-...
 nanoevolve inspect /tmp/nanoevolve-hello-... <record-id>
 ```
 
+## Reproducible Benchmark
+
+Run a deterministic eight-point packing trajectory without an API key or network access:
+
+```bash
+python examples/circle_packing/demo.py
+```
+
+The run improves the minimum pairwise distance from `0.4000000000` to `0.5176380902` across three inspectable generations. It is a compact benchmark of the actual generate–evaluate–select–archive loop rather than a synthetic score counter.
+
 ## Run a Real Model
 
 Create or reuse a project with three explicit files:

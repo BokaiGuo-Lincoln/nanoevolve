@@ -60,6 +60,16 @@ nanoevolve best /tmp/nanoevolve-hello-...
 nanoevolve inspect /tmp/nanoevolve-hello-... <record-id>
 ```
 
+## 可复现基准
+
+无需 API key 或网络即可运行确定性的八点装箱演化轨迹：
+
+```bash
+python examples/circle_packing/demo.py
+```
+
+该运行通过三个可检查 generation，将最小点间距从 `0.4000000000` 提升到 `0.5176380902`。它验证的是真实 generate–evaluate–select–archive 循环，而不是合成分数计数器。
+
 ## 接入真实模型
 
 一个实验只需要三个显式文件：

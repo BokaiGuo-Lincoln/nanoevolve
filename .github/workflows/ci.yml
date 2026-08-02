@@ -43,6 +43,8 @@ jobs:
         run: python -m nanoevolve --version
       - name: Run deterministic demo
         run: python examples/hello_evolve/demo.py
+      - name: Run circle-packing benchmark
+        run: python examples/circle_packing/demo.py
       - name: Run roadmap showcase
         run: python examples/roadmap_showcase/demo.py
 
@@ -81,6 +83,7 @@ jobs:
               "SECURITY.md",
               "CHANGELOG.md",
               "examples/hello_evolve/demo.py",
+              "examples/circle_packing/demo.py",
               "examples/roadmap_showcase/demo.py",
               "scripts/release_check.py",
               "tests/test_engine.py",
@@ -109,4 +112,5 @@ jobs:
           record=$(echo "$output" | sed -n 's/^Inspect: nanoevolve inspect .* \([^ ]*\)$/\1/p')
           .release-venv/bin/nanoevolve best "$project" --json
           .release-venv/bin/nanoevolve inspect "$project" "$record" --json
+          .release-venv/bin/python examples/circle_packing/demo.py
           .release-venv/bin/python examples/roadmap_showcase/demo.py
