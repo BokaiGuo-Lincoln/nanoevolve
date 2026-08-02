@@ -105,6 +105,59 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(inspected["lineage"]), 2)
         self.assertIn("source", inspected["record"]["artifacts"])
 
+    def test_inspect_artifact_prints_the_exact_persisted_content(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 2\n```"]
+        self.assertEqual(
+            self.invoke(
+                "run",
+                str(self.project),
+                "--iterations",
+                "1",
+                *self.model_arguments(),
+            )[0],
+            0,
+        )
+        archive = Archive.open(self.project / ".nanoevolve")
+        best = archive.best()
+        expected = archive.read_artifact(best, "prompt")
+
+        code, stdout, stderr = self.invoke(
+            "inspect",
+            str(self.project),
+            best.id,
+            "--artifact",
+            "prompt",
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(stdout, expected)
+
+    def test_inspect_artifact_reports_a_missing_name(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 2\n```"]
+        self.assertEqual(
+            self.invoke(
+                "run",
+                str(self.project),
+                "--iterations",
+                "1",
+                *self.model_arguments(),
+            )[0],
+            0,
+        )
+        best = Archive.open(self.project / ".nanoevolve").best()
+
+        code, stdout, stderr = self.invoke(
+            "inspect",
+            str(self.project),
+            best.id,
+            "--artifact",
+            "missing",
+        )
+
+        self.assertEqual(code, 2)
+        self.assertEqual(stdout, "")
+        self.assertIn("has no artifact 'missing'", stderr)
+
     def test_run_json_events_emits_one_object_per_line(self):
         _SequenceHandler.responses = ["```python\nSCORE = 2\n```"]
 

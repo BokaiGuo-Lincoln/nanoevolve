@@ -4,6 +4,13 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.4.4] - 2026-08-02
+
+### Added
+
+- Direct, exact artifact output through `inspect --artifact NAME`, while preserving the four-command CLI boundary.
+- Clean-wheel verification that persisted prompt artifacts can be exported without framing text.
+
 ## [0.4.3] - 2026-08-02
 
 ### Added

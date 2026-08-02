@@ -272,6 +272,9 @@ def _inspect(arguments: argparse.Namespace) -> int:
         record = next(item for item in archive.records if item.id == arguments.record_id)
     except StopIteration as error:
         raise EvolutionError(f"record not found: {arguments.record_id}") from error
+    if arguments.artifact:
+        sys.stdout.write(archive.read_artifact(record, arguments.artifact))
+        return 0
     lineage = _lineage(archive, record)
     if arguments.json:
         print(
@@ -336,7 +339,9 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="inspect one record")
     inspect_parser.add_argument("project", type=Path)
     inspect_parser.add_argument("record_id")
-    inspect_parser.add_argument("--json", action="store_true")
+    inspect_output = inspect_parser.add_mutually_exclusive_group()
+    inspect_output.add_argument("--json", action="store_true")
+    inspect_output.add_argument("--artifact")
     inspect_parser.set_defaults(handler=_inspect)
     return parser
 

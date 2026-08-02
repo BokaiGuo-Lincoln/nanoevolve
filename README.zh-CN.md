@@ -159,6 +159,14 @@ nanoevolve run my-experiment --iterations 100 --json-events 2>events.jsonl
 
 `events.jsonl` 的每一行都是一个包含 `type`、`generation`、`record_id` 和 `data` 的 JSON 对象。事件覆盖 parent selection、模型完成、候选提取、archive commit、失败和 new-best。
 
+`inspect` 还可以不添加标签或格式，原样输出一个已经持久化的 artifact：
+
+```bash
+nanoevolve inspect my-experiment <record-id> --artifact prompt > prompt.txt
+```
+
+Artifact 名称来自普通 `inspect` 输出中的列表。`--artifact` 与 `--json` 互斥。
+
 ## 路线图能力
 
 所有高级能力均为显式可选项，并且仍然只通过 `evolve()` 或既有的 `run`/`resume` 命令进入：
