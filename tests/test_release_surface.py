@@ -16,6 +16,12 @@ class ReleaseCheckTests(unittest.TestCase):
             readme = (ROOT / filename).read_text(encoding="utf-8")
             self.assertIn("python examples/circle_packing/demo.py", readme)
 
+    def test_readmes_surface_json_event_streams(self):
+        for filename in ("README.md", "README.zh-CN.md"):
+            readme = (ROOT / filename).read_text(encoding="utf-8")
+            self.assertIn("--json-events", readme)
+            self.assertIn("events.jsonl", readme)
+
     def test_current_repository_passes_static_checks(self):
         self.assertEqual(collect_static_failures(ROOT), [])
 
@@ -64,6 +70,7 @@ class WorkflowTests(unittest.TestCase):
             "python scripts/release_check.py --checks-only",
             "python -m build",
             "python -m nanoevolve --version",
+            "python -m nanoevolve run --help",
             "examples/hello_evolve/demo.py",
             "examples/circle_packing/demo.py",
             "examples/roadmap_showcase/demo.py",

@@ -56,6 +56,7 @@ def _add_model_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_evolution_arguments(parser: argparse.ArgumentParser, *, resume: bool) -> None:
     default = None if resume else argparse.SUPPRESS
+    parser.add_argument("--json-events", action="store_true")
     parser.add_argument(
         "--mutation-mode",
         choices=("full", "search_replace", "evolve_blocks"),
@@ -159,6 +160,25 @@ def _render_event(event: EvolutionEvent) -> None:
         )
 
 
+def _render_json_event(event: EvolutionEvent) -> None:
+    print(
+        json.dumps(
+            {
+                "type": event.type,
+                "generation": event.generation,
+                "record_id": event.record_id,
+                "data": dict(event.data),
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
+    )
+
+
+def _event_renderer(arguments: argparse.Namespace) -> Callable[[EvolutionEvent], None]:
+    return _render_json_event if arguments.json_events else _render_event
+
+
 def _print_best(record: Record, as_json: bool = False) -> None:
     if as_json:
         print(json.dumps(record.to_dict(), indent=2, sort_keys=True))
@@ -199,7 +219,7 @@ def _run(arguments: argparse.Namespace) -> int:
         workdir=workdir,
         random_seed=arguments.random_seed,
         timeout=arguments.timeout,
-        on_event=_render_event,
+        on_event=_event_renderer(arguments),
         **_evolution_options(arguments),
     )
     _print_best(best)
@@ -230,7 +250,7 @@ def _resume(arguments: argparse.Namespace) -> int:
         workdir=workdir,
         random_seed=random_seed,
         timeout=arguments.timeout,
-        on_event=_render_event,
+        on_event=_event_renderer(arguments),
         **_evolution_options(arguments, archive.metadata),
     )
     _print_best(best)

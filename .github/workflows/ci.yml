@@ -41,6 +41,8 @@ jobs:
         run: python scripts/release_check.py --checks-only
       - name: Check module entry point
         run: python -m nanoevolve --version
+      - name: Check structured event option
+        run: python -m nanoevolve run --help
       - name: Run deterministic demo
         run: python examples/hello_evolve/demo.py
       - name: Run circle-packing benchmark
@@ -96,6 +98,7 @@ jobs:
           python -m venv .release-venv
           .release-venv/bin/python -m pip install dist/*.whl
           .release-venv/bin/python -m nanoevolve --version
+          .release-venv/bin/python -m nanoevolve run --help
           .release-venv/bin/python - <<'PY'
           import importlib.metadata
           import nanoevolve

@@ -151,6 +151,14 @@ def evaluate(source_path: str) -> Evaluation:
 
 `best` 和 `inspect` 支持 `--json`，便于脚本集成。
 
+`run` 与 `resume` 支持把逐行事件流写到 stderr，同时让最终 best-record 摘要继续保留在 stdout：
+
+```bash
+nanoevolve run my-experiment --iterations 100 --json-events 2>events.jsonl
+```
+
+`events.jsonl` 的每一行都是一个包含 `type`、`generation`、`record_id` 和 `data` 的 JSON 对象。事件覆盖 parent selection、模型完成、候选提取、archive commit、失败和 new-best。
+
 ## 路线图能力
 
 所有高级能力均为显式可选项，并且仍然只通过 `evolve()` 或既有的 `run`/`resume` 命令进入：

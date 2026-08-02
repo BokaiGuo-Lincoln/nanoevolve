@@ -151,6 +151,14 @@ def evaluate(source_path: str) -> Evaluation:
 
 `best` and `inspect` support `--json` for scripts.
 
+`run` and `resume` support a line-oriented event stream on stderr while keeping the final best-record summary on stdout:
+
+```bash
+nanoevolve run my-experiment --iterations 100 --json-events 2>events.jsonl
+```
+
+Each line in `events.jsonl` is one JSON object with `type`, `generation`, `record_id`, and `data`. The stream includes parent selection, model completion, candidate extraction, archive commits, failures, and new-best events.
+
 ## Roadmap Features
 
 All advanced behavior is opt-in and still enters through `evolve()` or the existing `run`/`resume` commands:

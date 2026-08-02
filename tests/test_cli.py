@@ -105,6 +105,71 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(inspected["lineage"]), 2)
         self.assertIn("source", inspected["record"]["artifacts"])
 
+    def test_run_json_events_emits_one_object_per_line(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 2\n```"]
+
+        code, stdout, stderr = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            "--json-events",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("best score: 2.0", stdout)
+        events = [json.loads(line) for line in stderr.splitlines()]
+        self.assertTrue(events)
+        self.assertTrue(
+            all(
+                set(event) == {"type", "generation", "record_id", "data"}
+                for event in events
+            )
+        )
+        self.assertTrue(
+            {
+                "generation_started",
+                "parent_selected",
+                "model_completed",
+                "candidate_extracted",
+                "record_committed",
+                "new_best",
+            }.issubset({event["type"] for event in events})
+        )
+
+    def test_resume_json_events_emits_only_new_generations(self):
+        _SequenceHandler.responses = [
+            "```python\nSCORE = 1\n```",
+            "```python\nSCORE = 2\n```",
+        ]
+        self.assertEqual(
+            self.invoke(
+                "run",
+                str(self.project),
+                "--iterations",
+                "1",
+                *self.model_arguments(),
+            )[0],
+            0,
+        )
+
+        code, stdout, stderr = self.invoke(
+            "resume",
+            str(self.project),
+            "--iterations",
+            "2",
+            "--json-events",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("best score: 2.0", stdout)
+        events = [json.loads(line) for line in stderr.splitlines()]
+        self.assertTrue(events)
+        self.assertEqual({event["generation"] for event in events}, {2})
+        self.assertIn("new_best", {event["type"] for event in events})
+
     def test_run_refuses_existing_state(self):
         _SequenceHandler.responses = ["```python\nSCORE = 1\n```"]
         first = self.invoke(

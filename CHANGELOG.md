@@ -4,6 +4,13 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.4.3] - 2026-08-02
+
+### Added
+
+- Machine-readable JSON Lines event streams for `run` and `resume` through `--json-events`, without adding another CLI command.
+- Source-checkout and clean-wheel help verification for the structured event option.
+
 ## [0.4.2] - 2026-08-02
 
 ### Added
