@@ -8,6 +8,7 @@ import random
 import shutil
 import sqlite3
 import tempfile
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
@@ -75,10 +76,11 @@ class Archive:
         if backend == "jsonl":
             (root_path / "records.jsonl").touch()
         elif backend == "sqlite":
-            with sqlite3.connect(root_path / "records.sqlite3") as connection:
+            with closing(sqlite3.connect(root_path / "records.sqlite3")) as connection:
                 connection.execute(
                     "CREATE TABLE records (generation INTEGER PRIMARY KEY, payload TEXT NOT NULL)"
                 )
+                connection.commit()
         else:
             raise ValueError(f"unknown archive backend: {backend}")
         return cls(root_path, metadata, [])
@@ -100,7 +102,7 @@ class Archive:
     def _load_records(self) -> list[Record]:
         if self.backend == "sqlite":
             try:
-                with sqlite3.connect(self.sqlite_path) as connection:
+                with closing(sqlite3.connect(self.sqlite_path)) as connection:
                     rows = connection.execute(
                         "SELECT payload FROM records ORDER BY generation"
                     ).fetchall()
@@ -256,11 +258,12 @@ class Archive:
         )
         if self.backend == "sqlite":
             try:
-                with sqlite3.connect(self.sqlite_path) as connection:
+                with closing(sqlite3.connect(self.sqlite_path)) as connection:
                     connection.execute(
                         "INSERT INTO records (generation, payload) VALUES (?, ?)",
                         (record.generation, serialized),
                     )
+                    connection.commit()
             except sqlite3.Error as error:
                 raise ArchiveError(f"cannot commit SQLite record: {error}") from error
             return

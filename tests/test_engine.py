@@ -153,16 +153,28 @@ class EvolutionEngineTests(unittest.TestCase):
         self.assertIn("workspace/pkg/helper.py", best.artifacts)
 
     def test_parallel_workers_evaluate_a_generation_batch(self):
-        model = SequenceModel([code(1), code(2)])
-        started = time.monotonic()
-
-        best = self.run_evolve(
-            model, 2, evaluate=evaluate_slow_score, workers=2
+        sequential_started = time.monotonic()
+        self.run_evolve(
+            SequenceModel([code(1), code(2)]),
+            2,
+            evaluate=evaluate_slow_score,
+            workdir=self.project / ".sequential",
+            workers=1,
         )
+        sequential_elapsed = time.monotonic() - sequential_started
 
-        elapsed = time.monotonic() - started
+        parallel_started = time.monotonic()
+        best = self.run_evolve(
+            SequenceModel([code(1), code(2)]),
+            2,
+            evaluate=evaluate_slow_score,
+            workdir=self.project / ".parallel",
+            workers=2,
+        )
+        parallel_elapsed = time.monotonic() - parallel_started
+
         self.assertEqual(best.evaluation.score, 2.0)
-        self.assertLess(elapsed, 0.75)
+        self.assertLess(parallel_elapsed, sequential_elapsed)
 
     def test_prompt_includes_inspiration_and_parent_artifacts(self):
         model = SequenceModel([code(1), code(2)])
