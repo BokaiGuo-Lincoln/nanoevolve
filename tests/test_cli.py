@@ -1,0 +1,180 @@
+import io
+import json
+import threading
+import tempfile
+import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+from nanoevolve.cli import main
+
+
+class _SequenceHandler(BaseHTTPRequestHandler):
+    responses = []
+    requests = []
+
+    def do_POST(self):
+        length = int(self.headers["Content-Length"])
+        type(self).requests.append(json.loads(self.rfile.read(length)))
+        if not type(self).responses:
+            self.send_error(500, "no scripted response")
+            return
+        content = type(self).responses.pop(0)
+        payload = json.dumps(
+            {"choices": [{"message": {"content": content}}]}
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format, *args):
+        return
+
+
+class CliTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.project = Path(self.tempdir.name)
+        (self.project / "TASK.md").write_text("# Goal\nIncrease SCORE.\n")
+        (self.project / "seed.py").write_text("SCORE = 0\n")
+        (self.project / "evaluate.py").write_text(
+            "from nanoevolve import Evaluation\n"
+            "def evaluate(source_path):\n"
+            "    namespace = {}\n"
+            "    exec(open(source_path, encoding='utf-8').read(), namespace)\n"
+            "    return Evaluation(namespace['SCORE'])\n"
+        )
+        _SequenceHandler.responses = []
+        _SequenceHandler.requests = []
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), _SequenceHandler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.base_url = f"http://127.0.0.1:{self.server.server_port}/v1"
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+        self.tempdir.cleanup()
+
+    def invoke(self, *arguments):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            result = main(list(arguments))
+        return result, stdout.getvalue(), stderr.getvalue()
+
+    def model_arguments(self):
+        return (
+            "--model",
+            "test-model",
+            "--base-url",
+            self.base_url,
+            "--api-key",
+            "test-key",
+        )
+
+    def test_run_best_and_inspect_commands(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 2\n```"]
+
+        code, stdout, stderr = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            *self.model_arguments(),
+        )
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("best score: 2.0", stdout)
+
+        code, stdout, stderr = self.invoke("best", str(self.project), "--json")
+        self.assertEqual(code, 0, stderr)
+        best = json.loads(stdout)
+        self.assertEqual(best["evaluation"]["score"], 2.0)
+
+        code, stdout, stderr = self.invoke(
+            "inspect", str(self.project), best["id"], "--json"
+        )
+        self.assertEqual(code, 0, stderr)
+        inspected = json.loads(stdout)
+        self.assertEqual(inspected["record"]["id"], best["id"])
+        self.assertEqual(len(inspected["lineage"]), 2)
+        self.assertIn("source", inspected["record"]["artifacts"])
+
+    def test_run_refuses_existing_state(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 1\n```"]
+        first = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            *self.model_arguments(),
+        )
+        self.assertEqual(first[0], 0, first[2])
+
+        second = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            *self.model_arguments(),
+        )
+        self.assertEqual(second[0], 2)
+        self.assertIn("already exists", second[2])
+
+    def test_resume_targets_total_generation(self):
+        _SequenceHandler.responses = [
+            "```python\nSCORE = 1\n```",
+            "```python\nSCORE = 2\n```",
+        ]
+        self.assertEqual(
+            self.invoke(
+                "run",
+                str(self.project),
+                "--iterations",
+                "1",
+                *self.model_arguments(),
+            )[0],
+            0,
+        )
+
+        resumed = self.invoke(
+            "resume",
+            str(self.project),
+            "--iterations",
+            "2",
+            *self.model_arguments(),
+        )
+        self.assertEqual(resumed[0], 0, resumed[2])
+        self.assertEqual(len(_SequenceHandler.requests), 2)
+
+        repeated = self.invoke(
+            "resume",
+            str(self.project),
+            "--iterations",
+            "2",
+            *self.model_arguments(),
+        )
+        self.assertEqual(repeated[0], 0, repeated[2])
+        self.assertEqual(len(_SequenceHandler.requests), 2)
+
+    def test_reports_missing_project_files(self):
+        (self.project / "TASK.md").unlink()
+
+        code, _, stderr = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(code, 2)
+        self.assertIn("TASK.md", stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
