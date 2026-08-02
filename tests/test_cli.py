@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from nanoevolve.cli import main
+from nanoevolve.archive import Archive
 
 
 class _SequenceHandler(BaseHTTPRequestHandler):
@@ -45,7 +46,7 @@ class CliTests(unittest.TestCase):
             "def evaluate(source_path):\n"
             "    namespace = {}\n"
             "    exec(open(source_path, encoding='utf-8').read(), namespace)\n"
-            "    return Evaluation(namespace['SCORE'])\n"
+            "    return Evaluation(namespace['SCORE'], metrics={'kind': namespace['SCORE']})\n"
         )
         _SequenceHandler.responses = []
         _SequenceHandler.requests = []
@@ -174,6 +175,72 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
         self.assertIn("TASK.md", stderr)
+
+    def test_run_accepts_all_roadmap_options_without_new_commands(self):
+        _SequenceHandler.responses = [
+            (
+                "<<<<<<< SEARCH\npath: seed.py\nSCORE = 0\n=======\n"
+                "SCORE = 3\n>>>>>>> REPLACE\n"
+            )
+        ]
+
+        code, stdout, stderr = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            "--mutation-mode",
+            "search_replace",
+            "--inspiration-count",
+            "1",
+            "--artifact-feedback",
+            "stdout",
+            "--workers",
+            "2",
+            "--archive-backend",
+            "sqlite",
+            "--objective",
+            "score:max",
+            "--feature",
+            "kind",
+            "--feature-bin",
+            "kind=1",
+            "--islands",
+            "2",
+            "--migration-interval",
+            "2",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertIn("best score: 3.0", stdout)
+        archive = Archive.open(self.project / ".nanoevolve")
+        self.assertEqual(archive.metadata["archive_backend"], "sqlite")
+        self.assertEqual(archive.metadata["mutation_mode"], "search_replace")
+
+    def test_resume_reuses_recorded_roadmap_options(self):
+        _SequenceHandler.responses = ["```python\nSCORE = 1\n```", "```python\nSCORE = 2\n```"]
+        first = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "1",
+            "--workers",
+            "2",
+            *self.model_arguments(),
+        )
+        self.assertEqual(first[0], 0, first[2])
+
+        resumed = self.invoke(
+            "resume",
+            str(self.project),
+            "--iterations",
+            "2",
+            *self.model_arguments(),
+        )
+
+        self.assertEqual(resumed[0], 0, resumed[2])
+        self.assertEqual(Archive.open(self.project / ".nanoevolve").metadata["workers"], 2)
 
 
 if __name__ == "__main__":

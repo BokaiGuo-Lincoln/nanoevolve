@@ -80,6 +80,8 @@ class Record:
     artifacts: Mapping[str, str] = field(default_factory=dict)
     artifact_hashes: Mapping[str, str] = field(default_factory=dict)
     created_at: str | None = None
+    island: int = 0
+    feature_coordinates: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -90,8 +92,11 @@ class Record:
             raise ValueError(f"unknown record status: {self.status}")
         if self.status == "success" and self.evaluation is None:
             raise ValueError("successful records require an evaluation")
+        if self.island < 0:
+            raise ValueError("island must be non-negative")
         object.__setattr__(self, "artifacts", dict(self.artifacts))
         object.__setattr__(self, "artifact_hashes", dict(self.artifact_hashes))
+        object.__setattr__(self, "feature_coordinates", tuple(self.feature_coordinates))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -107,6 +112,8 @@ class Record:
             "artifacts": dict(self.artifacts),
             "artifact_hashes": dict(self.artifact_hashes),
             "created_at": self.created_at,
+            "island": self.island,
+            "feature_coordinates": list(self.feature_coordinates),
         }
 
     @classmethod
@@ -127,6 +134,8 @@ class Record:
             artifacts=value.get("artifacts", {}),
             artifact_hashes=value.get("artifact_hashes", {}),
             created_at=value.get("created_at"),
+            island=int(value.get("island", 0)),
+            feature_coordinates=tuple(value.get("feature_coordinates", ())),
         )
 
 

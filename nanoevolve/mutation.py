@@ -7,7 +7,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Protocol
+from pathlib import PurePosixPath
+from typing import Mapping, Protocol, Sequence
 
 from .types import Evaluation
 
@@ -29,12 +30,49 @@ class Model(Protocol):
         ...
 
 
-def build_prompt(task: str, parent_source: str, evaluation: Evaluation) -> str:
+def _safe_path(value: str) -> str:
+    path = PurePosixPath(value.strip())
+    if not value.strip() or path.is_absolute() or ".." in path.parts or "." in path.parts:
+        raise InvalidModelResponse(f"unsafe workspace path: {value!r}")
+    return path.as_posix()
+
+
+def build_prompt(
+    task: str,
+    parent_source: str,
+    evaluation: Evaluation,
+    *,
+    mutation_mode: str = "full",
+    inspirations: Sequence[tuple[str, str, Evaluation]] = (),
+    artifact_feedback: Mapping[str, str] | None = None,
+    multi_file: bool = False,
+) -> str:
     metrics = json.dumps(dict(evaluation.metrics), sort_keys=True)
-    return (
+    instructions = {
+        "full": "Return exactly one fenced Python code block containing the complete candidate source.",
+        "search_replace": (
+            "Return one or more exact SEARCH/REPLACE blocks. Each block must contain "
+            "a 'path: relative/path.py' line, SEARCH text, =======, replacement text, "
+            "and >>>>>>> REPLACE."
+        ),
+        "evolve_blocks": (
+            "Return one or more named EVOLVE blocks using <<<<<<< EVOLVE name, the "
+            "replacement body, and >>>>>>> EVOLVE."
+        ),
+    }
+    try:
+        instruction = instructions[mutation_mode]
+    except KeyError as error:
+        raise ValueError(f"unknown mutation mode: {mutation_mode}") from error
+    if mutation_mode == "full" and multi_file:
+        instruction = (
+            "Return the complete workspace as one or more sections formatted as "
+            "'### FILE: relative/path.py' followed by one fenced code block. Files "
+            "omitted from the response are deleted."
+        )
+    prompt = (
         "You are a program mutation operator. Improve the parent program for the "
-        "task below. Do not explain your reasoning. Return exactly one fenced Python "
-        "code block containing the complete candidate source.\n\n"
+        f"task below. Do not explain your reasoning. {instruction}\n\n"
         "## Task\n"
         f"{task.rstrip()}\n\n"
         "## Parent evaluation\n"
@@ -46,6 +84,18 @@ def build_prompt(task: str, parent_source: str, evaluation: Evaluation) -> str:
         f"{parent_source.rstrip()}\n"
         "```\n"
     )
+    if inspirations:
+        prompt += "\n## Inspiration candidates\n"
+        for record_id, source, inspiration_evaluation in inspirations:
+            prompt += (
+                f"### {record_id}\nScore: {inspiration_evaluation.score}\n"
+                f"```python\n{source.rstrip()}\n```\n"
+            )
+    if artifact_feedback:
+        prompt += "\n## Artifact feedback\n"
+        for name, content in sorted(artifact_feedback.items()):
+            prompt += f"### {name}\n```text\n{content.rstrip()}\n```\n"
+    return prompt
 
 
 _PYTHON_BLOCK = re.compile(r"```(?:python|py)[ \t]*\r?\n(.*?)```", re.DOTALL | re.IGNORECASE)
@@ -61,6 +111,105 @@ def extract_python_source(response: str) -> str:
     if not source:
         raise InvalidModelResponse("Python code block is empty")
     return source + "\n"
+
+
+_FILE_BLOCK = re.compile(
+    r"^### FILE:[ \t]*(.+?)[ \t]*\r?\n```(?:python|py|text)?[ \t]*\r?\n(.*?)```",
+    re.DOTALL | re.IGNORECASE | re.MULTILINE,
+)
+
+
+def extract_workspace(response: str, default_path: str) -> dict[str, str]:
+    matches = _FILE_BLOCK.findall(response)
+    if not matches:
+        return {_safe_path(default_path): extract_python_source(response)}
+    workspace: dict[str, str] = {}
+    for raw_path, raw_content in matches:
+        path = _safe_path(raw_path)
+        if path in workspace:
+            raise InvalidModelResponse(f"duplicate workspace path: {path}")
+        workspace[path] = raw_content.strip() + "\n"
+    return workspace
+
+
+_SEARCH_REPLACE = re.compile(
+    r"<<<<<<< SEARCH\r?\npath:[ \t]*(.+?)[ \t]*\r?\n(.*?)=======\r?\n(.*?)>>>>>>> REPLACE",
+    re.DOTALL,
+)
+
+
+def apply_search_replace(
+    parent: Mapping[str, str], response: str
+) -> dict[str, str]:
+    matches = _SEARCH_REPLACE.findall(response)
+    if not matches:
+        raise InvalidModelResponse("expected at least one SEARCH/REPLACE block")
+    candidate = dict(parent)
+    for raw_path, search, replacement in matches:
+        path = _safe_path(raw_path)
+        if path not in candidate:
+            if search:
+                raise InvalidModelResponse(f"cannot search missing file: {path}")
+            candidate[path] = replacement
+            continue
+        occurrences = candidate[path].count(search)
+        if not search or occurrences != 1:
+            raise InvalidModelResponse(
+                f"SEARCH text for {path} must occur exactly once, found {occurrences}"
+            )
+        if replacement == "" and candidate[path] == search:
+            del candidate[path]
+        else:
+            candidate[path] = candidate[path].replace(search, replacement, 1)
+    if not candidate:
+        raise InvalidModelResponse("mutation deleted the entire workspace")
+    return candidate
+
+
+_EVOLVE_RESPONSE = re.compile(
+    r"<<<<<<< EVOLVE[ \t]+([^\r\n]+)\r?\n(.*?)>>>>>>> EVOLVE",
+    re.DOTALL,
+)
+_EVOLVE_REGION = re.compile(
+    r"(?P<start>^[ \t]*#[ \t]*EVOLVE-BLOCK:[ \t]*(?P<name>[^\r\n]+?)[ \t]+START[ \t]*$\r?\n)"
+    r"(?P<body>.*?)"
+    r"(?P<end>^[ \t]*#[ \t]*EVOLVE-BLOCK:[ \t]*(?P=name)[ \t]+END[ \t]*$)",
+    re.DOTALL | re.MULTILINE,
+)
+
+
+def apply_evolve_blocks(parent: Mapping[str, str], response: str) -> dict[str, str]:
+    replacements = _EVOLVE_RESPONSE.findall(response)
+    if not replacements:
+        raise InvalidModelResponse("expected at least one EVOLVE block")
+    requested: dict[str, str] = {}
+    for raw_name, body in replacements:
+        name = raw_name.strip()
+        if not name or name in requested:
+            raise InvalidModelResponse(f"duplicate or empty EVOLVE block: {name!r}")
+        requested[name] = body
+    found: dict[str, tuple[str, re.Match[str]]] = {}
+    for path, source in parent.items():
+        for match in _EVOLVE_REGION.finditer(source):
+            name = match.group("name").strip()
+            if name in found:
+                raise InvalidModelResponse(f"duplicate EVOLVE-BLOCK marker: {name}")
+            found[name] = (path, match)
+    missing = sorted(set(requested) - set(found))
+    if missing:
+        raise InvalidModelResponse("unknown EVOLVE blocks: " + ", ".join(missing))
+    candidate = dict(parent)
+    by_path: dict[str, list[tuple[re.Match[str], str]]] = {}
+    for name, body in requested.items():
+        path, match = found[name]
+        by_path.setdefault(path, []).append((match, body))
+    for path, changes in by_path.items():
+        source = candidate[path]
+        for match, body in sorted(changes, key=lambda item: item[0].start(), reverse=True):
+            replacement = match.group("start") + body + match.group("end")
+            source = source[: match.start()] + replacement + source[match.end() :]
+        candidate[path] = source
+    return candidate
 
 
 @dataclass(frozen=True)

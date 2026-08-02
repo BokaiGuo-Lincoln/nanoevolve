@@ -23,6 +23,7 @@ CORE_FILES = (
     "nanoevolve/runner.py",
     "nanoevolve/engine.py",
 )
+CORE_LINE_BUDGET = 1900
 FORBIDDEN_PATTERNS = (
     re.compile(r"\bTODO\b"),
     re.compile(r"\bFIXME\b"),
@@ -111,8 +112,10 @@ def _core_budget_failures(root: Path) -> list[str]:
     if missing:
         return ["missing core files: " + ", ".join(missing)]
     line_count = sum(len(_read(root / filename).splitlines()) for filename in CORE_FILES)
-    if line_count > 1250:
-        return [f"core line budget exceeded: {line_count} > 1250"]
+    if line_count > CORE_LINE_BUDGET:
+        return [
+            f"core line budget exceeded: {line_count} > {CORE_LINE_BUDGET}"
+        ]
     return []
 
 

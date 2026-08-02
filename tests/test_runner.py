@@ -1,5 +1,8 @@
 import os
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from nanoevolve.runner import (
     EvaluatorConfigurationError,
@@ -106,6 +109,41 @@ class SubprocessRunnerTests(unittest.TestCase):
         self.assertEqual(result.status, "success")
         self.assertLessEqual(len(result.stdout.encode()), 160)
         self.assertIn("truncated", result.stdout)
+
+    def test_evaluates_multifile_workspace(self):
+        result = SubprocessRunner(timeout=2).run(
+            {
+                "main.py": "SCORE = 4\n",
+                "pkg/helper.py": "value = 2\n",
+            },
+            evaluators.evaluate_workspace,
+        )
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.evaluation.score, 4.0)
+
+    def test_wraps_worker_with_external_sandbox_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "marker.txt"
+            wrapper = Path(directory) / "wrapper.py"
+            wrapper.write_text(
+                "import os, subprocess, sys\n"
+                "open(os.environ['NANO_TEST_MARKER'], 'w').write('wrapped')\n"
+                "raise SystemExit(subprocess.call(sys.argv[1:]))\n"
+            )
+            old = os.environ.get("NANO_TEST_MARKER")
+            os.environ["NANO_TEST_MARKER"] = str(marker)
+            try:
+                result = SubprocessRunner(
+                    timeout=2, sandbox_command=(sys.executable, str(wrapper))
+                ).run("x = 1\n", evaluators.evaluate_float)
+            finally:
+                if old is None:
+                    os.environ.pop("NANO_TEST_MARKER", None)
+                else:
+                    os.environ["NANO_TEST_MARKER"] = old
+            self.assertEqual(result.status, "success")
+            self.assertEqual(marker.read_text(), "wrapped")
 
 
 if __name__ == "__main__":

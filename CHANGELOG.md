@@ -4,7 +4,7 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
-## [Unreleased]
+## [0.4.0] - 2026-08-02
 
 ### Added
 
@@ -13,11 +13,19 @@ The format follows the structure of Keep a Changelog. Version publication remain
 - Typed-package marker and explicit wheel/source-distribution contents.
 - Cross-platform CI design for Python 3.11 through 3.13.
 - Contributor guide, security policy, and release-check tooling.
+- SEARCH/REPLACE and EVOLVE-BLOCK mutation formats.
+- Inspiration candidates and bounded artifact feedback in persisted prompts.
+- Multi-file workspace snapshots and evaluator support.
+- External sandbox command wrappers and deterministic parallel evaluator batches.
+- Optional SQLite record indexing.
+- Lexicographic multi-objective selection.
+- Metric-binned MAP-Elites, feature coordinates, islands, and migration.
 
 ### Changed
 
 - Expanded English and Chinese README release guidance.
 - Hardened package metadata without inventing author, license, or repository fields.
+- Raised the explicit core complexity budget from the v0.1 threshold to 1,900 lines for the completed roadmap.
 
 ## [0.1.0] - 2026-08-02
 

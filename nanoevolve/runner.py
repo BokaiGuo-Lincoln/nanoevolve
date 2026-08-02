@@ -11,8 +11,8 @@ import sys
 import tempfile
 import traceback
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Callable, Mapping
+from pathlib import Path, PurePosixPath
+from typing import Any, Callable, Mapping, Sequence
 
 from .types import Evaluation, RecordStatus
 
@@ -108,6 +108,7 @@ class SubprocessRunner:
     timeout: float = 30.0
     output_limit: int = 64 * 1024
     result_limit: int = 1024 * 1024
+    sandbox_command: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.timeout <= 0:
@@ -116,10 +117,12 @@ class SubprocessRunner:
             raise ValueError("output_limit must be positive")
         if self.result_limit <= 0:
             raise ValueError("result_limit must be positive")
+        if self.sandbox_command is not None and not self.sandbox_command:
+            raise ValueError("sandbox_command must not be empty")
 
     def run(
         self,
-        candidate_source: str,
+        candidate_source: str | Mapping[str, str],
         evaluate: Callable[[str], object],
     ) -> RunnerResult:
         evaluator = resolve_evaluator(evaluate)
@@ -132,7 +135,23 @@ class SubprocessRunner:
             stdout_path = workdir / "stdout.txt"
             stderr_path = workdir / "stderr.txt"
 
-            candidate_path.write_text(candidate_source, encoding="utf-8")
+            if isinstance(candidate_source, str):
+                candidate_path.write_text(candidate_source, encoding="utf-8")
+            else:
+                candidate_path = workdir / "workspace"
+                candidate_path.mkdir()
+                for raw_path, source in candidate_source.items():
+                    relative = PurePosixPath(raw_path)
+                    if (
+                        not raw_path
+                        or relative.is_absolute()
+                        or ".." in relative.parts
+                        or "." in relative.parts
+                    ):
+                        raise ValueError(f"unsafe workspace path: {raw_path!r}")
+                    destination = candidate_path.joinpath(*relative.parts)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_text(source, encoding="utf-8")
             shutil.copy2(evaluator.path, evaluator_path)
             control_path.write_text(
                 json.dumps(
@@ -153,6 +172,8 @@ class SubprocessRunner:
                 "--worker",
                 str(control_path),
             ]
+            if self.sandbox_command is not None:
+                command = [*self.sandbox_command, *command]
             try:
                 with stdout_path.open("wb") as stdout_handle, stderr_path.open(
                     "wb"

@@ -1,11 +1,17 @@
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from nanoevolve import EvolutionEvent, evolve
 from nanoevolve.archive import Archive
-from nanoevolve.engine import EvolutionError
-from tests.fixtures.evaluators import evaluate_score_constant, evaluate_seed_failure
+from nanoevolve.engine import EvolutionError, _validate_resume
+from tests.fixtures.evaluators import (
+    evaluate_score_constant,
+    evaluate_seed_failure,
+    evaluate_slow_score,
+    evaluate_workspace,
+)
 
 
 class SequenceModel:
@@ -123,6 +129,101 @@ class EvolutionEngineTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].generation, 0)
         self.assertEqual(records[0].status, "evaluation_error")
+
+    def test_multifile_search_replace_run(self):
+        workspace = self.project / "seed"
+        (workspace / "pkg").mkdir(parents=True)
+        (workspace / "main.py").write_text("SCORE = 0\n")
+        (workspace / "pkg" / "helper.py").write_text("value = 1\n")
+        response = (
+            "<<<<<<< SEARCH\npath: main.py\nSCORE = 0\n=======\nSCORE = 5\n"
+            ">>>>>>> REPLACE\n"
+        )
+
+        best = self.run_evolve(
+            SequenceModel([response]),
+            1,
+            seed=workspace,
+            evaluate=evaluate_workspace,
+            mutation_mode="search_replace",
+        )
+
+        self.assertEqual(best.evaluation.score, 5.0)
+        self.assertIn("workspace/main.py", best.artifacts)
+        self.assertIn("workspace/pkg/helper.py", best.artifacts)
+
+    def test_parallel_workers_evaluate_a_generation_batch(self):
+        model = SequenceModel([code(1), code(2)])
+        started = time.monotonic()
+
+        best = self.run_evolve(
+            model, 2, evaluate=evaluate_slow_score, workers=2
+        )
+
+        elapsed = time.monotonic() - started
+        self.assertEqual(best.evaluation.score, 2.0)
+        self.assertLess(elapsed, 0.75)
+
+    def test_prompt_includes_inspiration_and_parent_artifacts(self):
+        model = SequenceModel([code(1), code(2)])
+
+        self.run_evolve(
+            model,
+            2,
+            inspiration_count=1,
+            artifact_feedback=("stdout",),
+        )
+
+        self.assertIn("Inspiration candidates", model.prompts[1])
+        self.assertIn("Artifact feedback", model.prompts[1])
+
+    def test_legacy_archive_accepts_default_roadmap_options(self):
+        archive = Archive.create(
+            self.workdir,
+            {
+                "task_hash": "task",
+                "seed_hash": "seed",
+                "evaluator_hash": "evaluator",
+                "model": "model",
+                "random_seed": 42,
+            },
+        )
+
+        _validate_resume(
+            archive,
+            {
+                "task_hash": "task",
+                "seed_hash": "seed",
+                "evaluator_hash": "evaluator",
+                "model": "model",
+                "random_seed": 42,
+                "mutation_mode": "full",
+                "inspiration_count": 0,
+                "artifact_feedback": [],
+                "sandbox_command": None,
+                "workers": 1,
+                "archive_backend": "jsonl",
+                "objectives": ["score:max"],
+                "features": [],
+                "feature_bins": {},
+                "islands": 1,
+                "migration_interval": 0,
+            },
+        )
+
+    def test_single_file_run_rejects_multifile_response(self):
+        model = SequenceModel(
+            [
+                "### FILE: seed.py\n```python\nSCORE = 1\n```\n"
+                "### FILE: extra.py\n```python\nvalue = 2\n```\n"
+            ]
+        )
+
+        best = self.run_evolve(model, 1)
+
+        records = Archive.open(self.workdir).records
+        self.assertEqual(best.evaluation.score, 0.0)
+        self.assertEqual(records[1].status, "invalid_response")
 
 
 if __name__ == "__main__":

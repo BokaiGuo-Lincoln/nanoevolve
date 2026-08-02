@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 from typing import Callable
@@ -18,11 +19,15 @@ from .types import EvolutionEvent, Record
 def _project_files(project: Path) -> tuple[Path, Path, Path, Path]:
     project = project.resolve()
     task_path = project / "TASK.md"
-    seed_path = project / "seed.py"
+    seed_file = project / "seed.py"
+    seed_directory = project / "seed"
+    seed_path = seed_file if seed_file.is_file() else seed_directory
     evaluator_path = project / "evaluate.py"
-    for path in (task_path, seed_path, evaluator_path):
+    for path in (task_path, evaluator_path):
         if not path.is_file():
             raise EvolutionError(f"required project file is missing: {path.name}")
+    if not seed_path.exists():
+        raise EvolutionError("required project seed is missing: seed.py or seed/")
     return task_path, seed_path, evaluator_path, project / ".nanoevolve"
 
 
@@ -47,6 +52,82 @@ def _add_model_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--api-key", default=os.getenv("NANOEVOLVE_API_KEY"))
     parser.add_argument("--timeout", type=float, default=30.0)
+
+
+def _add_evolution_arguments(parser: argparse.ArgumentParser, *, resume: bool) -> None:
+    default = None if resume else argparse.SUPPRESS
+    parser.add_argument(
+        "--mutation-mode",
+        choices=("full", "search_replace", "evolve_blocks"),
+        default=None if resume else "full",
+    )
+    parser.add_argument("--evolve-blocks", action="store_true", default=False)
+    parser.add_argument("--inspiration-count", type=int, default=None if resume else 0)
+    parser.add_argument("--artifact-feedback", action="append", default=default)
+    parser.add_argument("--sandbox-command", default=None)
+    parser.add_argument("--workers", type=int, default=None if resume else 1)
+    parser.add_argument(
+        "--archive-backend",
+        choices=("jsonl", "sqlite"),
+        default=None if resume else "jsonl",
+    )
+    parser.add_argument("--objective", action="append", default=default)
+    parser.add_argument("--feature", action="append", default=default)
+    parser.add_argument("--feature-bin", action="append", default=default)
+    parser.add_argument("--islands", type=int, default=None if resume else 1)
+    parser.add_argument("--migration-interval", type=int, default=None if resume else 0)
+
+
+def _feature_bins(values: list[str]) -> dict[str, float]:
+    result: dict[str, float] = {}
+    for value in values:
+        try:
+            name, raw_width = value.split("=", 1)
+            width = float(raw_width)
+        except ValueError as error:
+            raise EvolutionError(f"invalid feature bin {value!r}; use NAME=WIDTH") from error
+        if not name:
+            raise EvolutionError("feature bin name must not be empty")
+        result[name] = width
+    return result
+
+
+def _evolution_options(
+    arguments: argparse.Namespace, metadata: dict | None = None
+) -> dict[str, object]:
+    metadata = metadata or {}
+
+    def value(name: str, fallback):
+        current = getattr(arguments, name, None)
+        return metadata.get(name, fallback) if current is None else current
+
+    mutation_mode = value("mutation_mode", "full")
+    if arguments.evolve_blocks:
+        mutation_mode = "evolve_blocks"
+    raw_sandbox = value("sandbox_command", None)
+    if isinstance(raw_sandbox, str):
+        sandbox_command = shlex.split(raw_sandbox)
+    else:
+        sandbox_command = raw_sandbox
+    raw_bins = value("feature_bin", None)
+    bins = (
+        dict(metadata.get("feature_bins", {}))
+        if raw_bins is None
+        else _feature_bins(raw_bins)
+    )
+    return {
+        "mutation_mode": mutation_mode,
+        "inspiration_count": value("inspiration_count", 0),
+        "artifact_feedback": value("artifact_feedback", []),
+        "sandbox_command": sandbox_command,
+        "workers": value("workers", 1),
+        "archive_backend": value("archive_backend", "jsonl"),
+        "objectives": value("objective", metadata.get("objectives", ["score:max"])),
+        "features": value("feature", metadata.get("features", [])),
+        "feature_bins": bins,
+        "islands": value("islands", 1),
+        "migration_interval": value("migration_interval", 0),
+    }
 
 
 def _model(arguments: argparse.Namespace, fallback_name: str | None = None):
@@ -119,6 +200,7 @@ def _run(arguments: argparse.Namespace) -> int:
         random_seed=arguments.random_seed,
         timeout=arguments.timeout,
         on_event=_render_event,
+        **_evolution_options(arguments),
     )
     _print_best(best)
     return 0
@@ -149,6 +231,7 @@ def _resume(arguments: argparse.Namespace) -> int:
         random_seed=random_seed,
         timeout=arguments.timeout,
         on_event=_render_event,
+        **_evolution_options(arguments, archive.metadata),
     )
     _print_best(best)
     return 0
@@ -156,7 +239,8 @@ def _resume(arguments: argparse.Namespace) -> int:
 
 def _best(arguments: argparse.Namespace) -> int:
     workdir = arguments.project.resolve() / ".nanoevolve"
-    record = Archive.open(workdir).best()
+    archive = Archive.open(workdir)
+    record = archive.best(archive.metadata.get("objectives", ("score:max",)))
     _print_best(record, as_json=arguments.json)
     return 0
 
@@ -212,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("project", type=Path)
     run_parser.add_argument("--iterations", type=int, default=100)
     run_parser.add_argument("--random-seed", type=int, default=42)
+    _add_evolution_arguments(run_parser, resume=False)
     _add_model_arguments(run_parser)
     run_parser.set_defaults(handler=_run)
 
@@ -219,6 +304,7 @@ def build_parser() -> argparse.ArgumentParser:
     resume_parser.add_argument("project", type=Path)
     resume_parser.add_argument("--iterations", type=int)
     resume_parser.add_argument("--random-seed", type=int)
+    _add_evolution_arguments(resume_parser, resume=True)
     _add_model_arguments(resume_parser)
     resume_parser.set_defaults(handler=_resume)
 

@@ -11,7 +11,7 @@ Preserve AlphaEvolve's generate–verify–select feedback loop, remove OpenEvol
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-stdlib_unittest-4C1)
-![Status](https://img.shields.io/badge/status-v0.1_active_development-F59E0B)
+![Status](https://img.shields.io/badge/status-v0.4_roadmap_complete-2E8B57)
 ![State](https://img.shields.io/badge/state-append--only_JSONL-6E56CF)
 
 </div>
@@ -128,7 +128,7 @@ def evaluate(source_path: str) -> Evaluation:
     )
 ```
 
-`score` is the only optimization target in v0.1. Metrics are recorded for inspection but do not affect selection.
+`score` remains the default optimization target. Named metrics can also drive lexicographic objectives and MAP-Elites feature coordinates.
 
 ## CLI
 
@@ -140,6 +140,32 @@ def evaluate(source_path: str) -> Evaluation:
 | `nanoevolve inspect <project> <record-id>` | Trace lineage, evaluation, errors, and artifacts. |
 
 `best` and `inspect` support `--json` for scripts.
+
+## Roadmap Features
+
+All advanced behavior is opt-in and still enters through `evolve()` or the existing `run`/`resume` commands:
+
+```bash
+nanoevolve run my-experiment \
+  --mutation-mode search_replace \
+  --inspiration-count 2 \
+  --artifact-feedback stdout \
+  --workers 4 \
+  --archive-backend sqlite \
+  --objective score:max \
+  --objective runtime_ms:min \
+  --feature size \
+  --feature-bin size=100 \
+  --islands 4 \
+  --migration-interval 20
+```
+
+- Use a `seed/` directory instead of `seed.py` for multi-file workspaces; evaluators receive the workspace directory path.
+- `full`, `search_replace`, and `evolve_blocks` mutation modes support complete snapshots, exact patches, and named editable regions.
+- `--sandbox-command "..."` wraps evaluator workers with an external isolation command; credentials must come from its environment, not command arguments.
+- `workers > 1` generates a deterministic batch sequentially, evaluates it concurrently, and commits records in generation order.
+- SQLite changes only the record index. Prompts, responses, workspaces, outputs, and evaluations remain ordinary hashed files.
+- Feature metrics plus bins activate simplified MAP-Elites. Islands select locally and widen the pool on migration generations.
 
 ## Version and Release Verification
 
@@ -162,7 +188,7 @@ Release infrastructure is intentionally separate from runtime dependencies. Whee
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for development conventions, [`SECURITY.md`](SECURITY.md) for the generated-code trust boundary, and [`CHANGELOG.md`](CHANGELOG.md) for validated milestones.
 
-Author, license, repository URL, and publication destination remain unset until the project owner provides authoritative values.
+The public repository is `BokaiGuo-Lincoln/nanoevolve`. Package author and license fields remain unset until the project owner provides authoritative values.
 
 ## Transparent State
 
@@ -171,10 +197,10 @@ Each project gets one inspectable state directory:
 ```text
 .nanoevolve/
 ├── run.json
-├── records.jsonl
+├── records.jsonl or records.sqlite3
 └── candidates/
     └── <record-id>/
-        ├── source.py
+        ├── source.py or workspace/...
         ├── prompt.txt
         ├── response.txt
         ├── evaluation.json
@@ -182,7 +208,7 @@ Each project gets one inspectable state directory:
         └── stderr.txt
 ```
 
-`run.json` is immutable initial metadata. `records.jsonl` is the only dynamic state truth. Candidate artifacts are written before their record becomes visible, and hashes are verified when the archive reopens.
+`run.json` is immutable initial metadata. `records.jsonl` is the default dynamic state truth; `records.sqlite3` is an opt-in equivalent index. Candidate artifacts are written before their record becomes visible, and hashes are verified when the archive reopens.
 
 Every mutation attempt consumes one generation—including invalid model responses, evaluator errors, and timeouts. Failed attempts remain inspectable but never enter the parent pool.
 
@@ -191,7 +217,7 @@ Every mutation attempt consumes one generation—including invalid model respons
 ```mermaid
 flowchart LR
     Task["TASK.md"] --> Mutation["mutation.py<br/>prompt + model + parser"]
-    Archive["archive.py<br/>JSONL + selection"] --> Engine["engine.py<br/>sequential loop"]
+    Archive["archive.py<br/>JSONL / SQLite + selection"] --> Engine["engine.py<br/>deterministic batches"]
     Engine --> Mutation
     Mutation --> Runner["runner.py<br/>fresh evaluator process"]
     Runner --> Engine
@@ -199,7 +225,7 @@ flowchart LR
     CLI["cli.py<br/>run / resume / best / inspect"] --> Engine
 ```
 
-The six semantic modules are intentionally concrete. v0.1 has no archive base class, policy hierarchy, provider registry, or observer framework.
+The six semantic modules remain concrete. NanoEvolve has no policy hierarchy, provider registry, hidden memory, or observer framework.
 
 ## Selection
 
@@ -210,7 +236,7 @@ The default parent policy is deliberately small:
 - Derive randomness from `SHA-256(run_seed, generation)`.
 - Resolve score ties by record ID.
 
-MAP-Elites, islands, migration, and multi-objective selection are later-stage options, not hidden core behavior.
+Optional selection layers are explicit: lexicographic score/metric objectives, metric-binned MAP-Elites, and deterministic islands with periodic migration. Leaving their flags unset preserves the original top-k behavior.
 
 ## Security Boundary
 
@@ -232,7 +258,7 @@ The default evaluator subprocess removes environment variables whose names conta
 - [x] `run`, `resume`, `best`, and `inspect`
 - [x] Deterministic no-network demo
 
-### v0.1.1 — Release hardening (Unreleased)
+### v0.1.1 — Release hardening
 
 - [x] `python -m nanoevolve` and shared `--version` support
 - [x] Typed wheel and explicit source-distribution contents
@@ -243,26 +269,26 @@ The default evaluator subprocess removes environment variables whose names conta
 
 ### v0.2 — Stronger mutation context
 
-- [ ] SEARCH/REPLACE diffs
-- [ ] EVOLVE-BLOCK regions
-- [ ] Inspiration candidates
-- [ ] Artifact feedback
+- [x] SEARCH/REPLACE diffs
+- [x] EVOLVE-BLOCK regions
+- [x] Inspiration candidates
+- [x] Artifact feedback
 
 ### v0.3 — Mini workspace
 
-- [ ] Multi-file workspaces
-- [ ] External sandbox command integration
-- [ ] Parallel evaluator workers
-- [ ] Optional SQLite archive
-- [ ] Multiple selection metrics
+- [x] Multi-file workspaces
+- [x] External sandbox command integration
+- [x] Parallel evaluator workers
+- [x] Optional SQLite archive
+- [x] Multiple selection metrics
 
 ### v0.4 — Quality diversity
 
-- [ ] Simplified MAP-Elites
-- [ ] User-provided feature coordinates
-- [ ] Optional islands and migration
+- [x] Simplified MAP-Elites
+- [x] User-provided feature coordinates
+- [x] Optional islands and migration
 
-Features move forward only when real runs demonstrate the need; parity with a larger framework is not a roadmap goal.
+The published v0.2-v0.4 roadmap is implemented. Future features still require concrete evidence from real runs; parity with a larger framework is not a goal.
 
 ## Development
 

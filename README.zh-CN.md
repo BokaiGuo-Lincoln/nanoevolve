@@ -11,7 +11,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-stdlib_unittest-4C1)
-![Status](https://img.shields.io/badge/status-v0.1_active_development-F59E0B)
+![Status](https://img.shields.io/badge/status-v0.4_roadmap_complete-2E8B57)
 ![State](https://img.shields.io/badge/state-append--only_JSONL-6E56CF)
 
 </div>
@@ -128,7 +128,7 @@ def evaluate(source_path: str) -> Evaluation:
     )
 ```
 
-v0.1 只优化 `score`。`metrics` 会被完整记录，但不参与选择。
+默认仍只优化 `score`。命名 metrics 也可以用于字典序多目标选择和 MAP-Elites feature coordinates。
 
 ## CLI
 
@@ -140,6 +140,32 @@ v0.1 只优化 `score`。`metrics` 会被完整记录，但不参与选择。
 | `nanoevolve inspect <project> <record-id>` | 检查 lineage、评估、错误和 artifacts。 |
 
 `best` 和 `inspect` 支持 `--json`，便于脚本集成。
+
+## 路线图能力
+
+所有高级能力均为显式可选项，并且仍然只通过 `evolve()` 或既有的 `run`/`resume` 命令进入：
+
+```bash
+nanoevolve run my-experiment \
+  --mutation-mode search_replace \
+  --inspiration-count 2 \
+  --artifact-feedback stdout \
+  --workers 4 \
+  --archive-backend sqlite \
+  --objective score:max \
+  --objective runtime_ms:min \
+  --feature size \
+  --feature-bin size=100 \
+  --islands 4 \
+  --migration-interval 20
+```
+
+- 用 `seed/` 目录替代 `seed.py` 即可启用多文件 workspace；evaluator 会收到 workspace 目录路径。
+- `full`、`search_replace`、`evolve_blocks` 分别支持完整快照、精确 patch 和命名可编辑区域。
+- `--sandbox-command "..."` 使用外部隔离命令包装 evaluator worker；凭据必须通过环境提供，不能写入命令参数。
+- `workers > 1` 会顺序生成确定性 batch、并行评估、再按 generation 顺序提交记录。
+- SQLite 只替换 record index；prompt、响应、workspace、输出和评估仍是普通的哈希文件。
+- Feature metrics 与 bins 启用简化 MAP-Elites；islands 默认本地选择，并在 migration generation 扩大候选池。
 
 ## 版本与发布验证
 
@@ -162,7 +188,7 @@ python scripts/release_check.py
 
 开发约定见 [`CONTRIBUTING.md`](CONTRIBUTING.md)，生成代码的信任边界见 [`SECURITY.md`](SECURITY.md)，已验证里程碑见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-作者、许可证、仓库 URL 和发布目标会保持空缺，直到项目所有者提供权威信息。
+公开仓库为 `BokaiGuo-Lincoln/nanoevolve`。Package author 与许可证字段仍保持空缺，直到项目所有者提供权威信息。
 
 ## 透明状态
 
@@ -171,10 +197,10 @@ python scripts/release_check.py
 ```text
 .nanoevolve/
 ├── run.json
-├── records.jsonl
+├── records.jsonl 或 records.sqlite3
 └── candidates/
     └── <record-id>/
-        ├── source.py
+        ├── source.py 或 workspace/...
         ├── prompt.txt
         ├── response.txt
         ├── evaluation.json
@@ -182,7 +208,7 @@ python scripts/release_check.py
         └── stderr.txt
 ```
 
-`run.json` 是不可变的初始元数据；`records.jsonl` 是唯一动态状态真相。候选 artifacts 会先写入磁盘，再让对应 record 对后续选择可见；archive 重新打开时会验证文件哈希。
+`run.json` 是不可变的初始元数据；`records.jsonl` 是默认动态状态真相，`records.sqlite3` 是可选的等价索引。候选 artifacts 会先写入磁盘，再让对应 record 对后续选择可见；archive 重新打开时会验证文件哈希。
 
 每一次 mutation attempt 都消耗一个 generation，包括非法模型响应、evaluator 异常和超时。失败尝试永久可检查，但不会进入 parent pool。
 
@@ -191,7 +217,7 @@ python scripts/release_check.py
 ```mermaid
 flowchart LR
     Task["TASK.md"] --> Mutation["mutation.py<br/>prompt + model + parser"]
-    Archive["archive.py<br/>JSONL + selection"] --> Engine["engine.py<br/>sequential loop"]
+    Archive["archive.py<br/>JSONL / SQLite + selection"] --> Engine["engine.py<br/>deterministic batches"]
     Engine --> Mutation
     Mutation --> Runner["runner.py<br/>fresh evaluator process"]
     Runner --> Engine
@@ -199,7 +225,7 @@ flowchart LR
     CLI["cli.py<br/>run / resume / best / inspect"] --> Engine
 ```
 
-六个语义模块保持具体而透明。v0.1 不提供 archive 抽象基类、policy 类层级、provider registry 或 observer framework。
+六个语义模块保持具体而透明。NanoEvolve 不提供 policy 类层级、provider registry、隐藏记忆或 observer framework。
 
 ## 选择策略
 
@@ -210,7 +236,7 @@ flowchart LR
 - 随机性来自 `SHA-256(run_seed, generation)`。
 - 同分记录通过 record ID 稳定排序。
 
-MAP-Elites、岛屿迁移和多目标选择是后续可选能力，不是隐藏在核心中的默认行为。
+可选选择层均显式启用：字典序 score/metric objectives、按 metric 分箱的 MAP-Elites，以及带周期迁移的确定性 islands。不设置这些参数时仍保持原始 top-k 行为。
 
 ## 安全边界
 
@@ -232,7 +258,7 @@ MAP-Elites、岛屿迁移和多目标选择是后续可选能力，不是隐藏�
 - [x] `run`、`resume`、`best`、`inspect`
 - [x] 无网络确定性示例
 
-### v0.1.1 — 发布硬化（尚未发布）
+### v0.1.1 — 发布硬化
 
 - [x] `python -m nanoevolve` 与共享 `--version`
 - [x] Typed wheel 与显式 source distribution 内容
@@ -243,26 +269,26 @@ MAP-Elites、岛屿迁移和多目标选择是后续可选能力，不是隐藏�
 
 ### v0.2 — 更强 mutation context
 
-- [ ] SEARCH/REPLACE diff
-- [ ] EVOLVE-BLOCK 区域
-- [ ] Inspiration candidates
-- [ ] Artifact feedback
+- [x] SEARCH/REPLACE diff
+- [x] EVOLVE-BLOCK 区域
+- [x] Inspiration candidates
+- [x] Artifact feedback
 
 ### v0.3 — Mini workspace
 
-- [ ] 多文件 workspace
-- [ ] 外部 sandbox command
-- [ ] 并行 evaluator workers
-- [ ] 可选 SQLite archive
-- [ ] 多指标选择
+- [x] 多文件 workspace
+- [x] 外部 sandbox command
+- [x] 并行 evaluator workers
+- [x] 可选 SQLite archive
+- [x] 多指标选择
 
 ### v0.4 — Quality diversity
 
-- [ ] 简化 MAP-Elites
-- [ ] 用户提供 feature coordinates
-- [ ] 可选 islands 与 migration
+- [x] 简化 MAP-Elites
+- [x] 用户提供 feature coordinates
+- [x] 可选 islands 与 migration
 
-只有真实运行暴露出明确需求时，能力才会进入下一阶段；“功能对齐更大的框架”不是路线图目标。
+已发布的 v0.2-v0.4 路线图现已全部实现。未来能力仍需由真实运行中的明确需求驱动；“功能对齐更大的框架”不是目标。
 
 ## 开发与验证
 

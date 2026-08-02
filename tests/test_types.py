@@ -54,6 +54,21 @@ class RecordTests(unittest.TestCase):
 
         self.assertEqual(Record.from_dict(record.to_dict()), record)
 
+    def test_round_trips_quality_diversity_metadata(self):
+        record = Record(
+            id="candidate",
+            parent_id=None,
+            generation=0,
+            status="success",
+            source_path="source.py",
+            evaluation=Evaluation(1),
+            error=None,
+            island=2,
+            feature_coordinates=(3, -1),
+        )
+
+        self.assertEqual(Record.from_dict(record.to_dict()), record)
+
     def test_rejects_unknown_status(self):
         with self.assertRaises(ValueError):
             Record(

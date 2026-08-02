@@ -57,3 +57,19 @@ def evaluate_score_constant(source_path: str):
 
 def evaluate_seed_failure(source_path: str):
     raise RuntimeError("seed cannot be evaluated")
+
+
+def evaluate_workspace(workspace_path: str):
+    main = open(os.path.join(workspace_path, "main.py"), encoding="utf-8").read()
+    helper = open(
+        os.path.join(workspace_path, "pkg", "helper.py"), encoding="utf-8"
+    ).read()
+    score = float(main.split("SCORE = ", 1)[1].splitlines()[0])
+    return Evaluation(score, metrics={"size": len(main) + len(helper), "kind": score})
+
+
+def evaluate_slow_score(source_path: str):
+    time.sleep(0.2)
+    namespace = {}
+    exec(open(source_path, encoding="utf-8").read(), namespace)
+    return Evaluation(float(namespace["SCORE"]))
