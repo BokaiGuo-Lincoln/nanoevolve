@@ -772,6 +772,12 @@ The line budget is a complexity budget, not an invitation to compress readable c
 - Resume-time stagnation pre-checks.
 - Deterministic parallel batch-boundary decisions.
 
+### v0.7: Run evidence summary
+
+- Optional best-candidate run summary.
+- Machine-readable summary output.
+- Explicit accounting for attempts, outcomes, completed generation, and stop reason.
+
 Each stage must respond to observed limitations in real use. Features are not added solely to claim parity with OpenEvolve.
 
 ## 19. Key Architectural Decisions

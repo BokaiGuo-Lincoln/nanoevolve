@@ -11,7 +11,7 @@ Preserve AlphaEvolve's generate–verify–select feedback loop, remove OpenEvol
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-stdlib_unittest-4C1)
-![Status](https://img.shields.io/badge/status-v0.6_stagnation_stopping-2E8B57)
+![Status](https://img.shields.io/badge/status-v0.7_run_evidence-2E8B57)
 ![State](https://img.shields.io/badge/state-append--only_JSONL-6E56CF)
 
 </div>
@@ -57,6 +57,7 @@ The printed temporary project remains available for the CLI:
 
 ```bash
 nanoevolve best /tmp/nanoevolve-hello-...
+nanoevolve best /tmp/nanoevolve-hello-... --summary
 nanoevolve inspect /tmp/nanoevolve-hello-... <record-id>
 ```
 
@@ -106,6 +107,8 @@ nanoevolve resume my-experiment --iterations 200
 `--target-score` stops before the next generation batch once any successful candidate reaches the requested score. The target is stored in `run.json` and reused by `resume`. With `workers > 1`, already-started candidates in the current batch are still evaluated and committed before the run stops.
 
 `--patience N` stops when `N` consecutive generations produce no new objective-best record. Failed generations count toward patience because they still consume an attempt. The setting is persisted for resume, and parallel runs decide only after the current batch is committed.
+
+`best --summary` reports attempts, successful/failed records, completed generation, configured stopping options, and the derived stop reason. Add `--json` for a machine-readable object containing both `best` and `summary`.
 
 ## Minimal Python API
 
@@ -350,7 +353,13 @@ The default evaluator subprocess removes environment variables whose names conta
 - [x] Resume pre-checks with zero unnecessary model calls
 - [x] Parallel batch-boundary decisions without premature stopping
 
-The published v0.2-v0.6 roadmap is implemented. Future features still require concrete evidence from real runs; parity with a larger framework is not a goal.
+### v0.7 — Run evidence summary
+
+- [x] Optional `best --summary` human-readable report
+- [x] JSON summary for scripts and dashboards
+- [x] Attempt, success, failure, generation, and stop-reason accounting
+
+The published v0.2-v0.7 roadmap is implemented. Future features still require concrete evidence from real runs; parity with a larger framework is not a goal.
 
 ## Development
 

@@ -196,15 +196,60 @@ def _event_renderer(arguments: argparse.Namespace) -> Callable[[EvolutionEvent],
     return _render_json_event if arguments.json_events else _render_event
 
 
-def _print_best(record: Record, as_json: bool = False) -> None:
+def _run_summary(archive: Archive, best: Record) -> dict[str, object]:
+    records = archive.records
+    target_score = archive.metadata.get("target_score")
+    target_reached = target_score is not None and any(
+        record.status == "success"
+        and record.evaluation is not None
+        and record.evaluation.score >= target_score
+        for record in records
+    )
+    patience = archive.metadata.get("patience")
+    patience_exhausted = patience is not None and (
+        records[-1].generation - best.generation >= patience
+    )
+    if target_reached:
+        stop_reason = "target_reached"
+    elif patience_exhausted:
+        stop_reason = "patience_exhausted"
+    else:
+        stop_reason = "generation_limit"
+    successful = sum(record.status == "success" for record in records)
+    return {
+        "attempts": max(0, len(records) - 1),
+        "successful": successful,
+        "failed": len(records) - successful,
+        "completed_generation": records[-1].generation,
+        "best_generation": best.generation,
+        "target_score": target_score,
+        "patience": patience,
+        "stop_reason": stop_reason,
+    }
+
+
+def _print_best(
+    record: Record,
+    as_json: bool = False,
+    summary: dict[str, object] | None = None,
+) -> None:
     if as_json:
-        print(json.dumps(record.to_dict(), indent=2, sort_keys=True))
+        payload = record.to_dict() if summary is None else {
+            "best": record.to_dict(),
+            "summary": summary,
+        }
+        print(json.dumps(payload, indent=2, sort_keys=True))
         return
     print(f"record: {record.id}")
     print(f"best score: {record.evaluation.score}")
     print(f"generation: {record.generation}")
     print(f"parent: {record.parent_id or '-'}")
     print(f"source: {record.source_path or '-'}")
+    if summary is not None:
+        print(f"stop reason: {summary['stop_reason']}")
+        print(f"attempts: {summary['attempts']}")
+        print(f"successful: {summary['successful']}")
+        print(f"failed: {summary['failed']}")
 
 
 def _lineage(archive: Archive, record: Record) -> list[Record]:
@@ -278,7 +323,8 @@ def _best(arguments: argparse.Namespace) -> int:
     workdir = arguments.project.resolve() / ".nanoevolve"
     archive = Archive.open(workdir)
     record = archive.best(archive.metadata.get("objectives", ("score:max",)))
-    _print_best(record, as_json=arguments.json)
+    summary = _run_summary(archive, record) if arguments.summary else None
+    _print_best(record, as_json=arguments.json, summary=summary)
     return 0
 
 
@@ -351,6 +397,7 @@ def build_parser() -> argparse.ArgumentParser:
     best_parser = subparsers.add_parser("best", help="show the best candidate")
     best_parser.add_argument("project", type=Path)
     best_parser.add_argument("--json", action="store_true")
+    best_parser.add_argument("--summary", action="store_true")
     best_parser.set_defaults(handler=_best)
 
     inspect_parser = subparsers.add_parser("inspect", help="inspect one record")

@@ -4,6 +4,13 @@ All notable changes to NanoEvolve are documented in this file.
 
 The format follows the structure of Keep a Changelog. Version publication remains an owner-controlled action; this file records the validated project milestones present in the workspace.
 
+## [0.7.0] - 2026-08-03
+
+### Added
+
+- Optional `best --summary` output for attempts, success/failure counts, completed generation, stopping options, and derived stop reason.
+- `best --summary --json` machine-readable output containing separate `best` and `summary` objects.
+
 ## [0.6.0] - 2026-08-02
 
 ### Added

@@ -11,7 +11,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime_dependencies-0-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-stdlib_unittest-4C1)
-![Status](https://img.shields.io/badge/status-v0.6_stagnation_stopping-2E8B57)
+![Status](https://img.shields.io/badge/status-v0.7_run_evidence-2E8B57)
 ![State](https://img.shields.io/badge/state-append--only_JSONL-6E56CF)
 
 </div>
@@ -57,6 +57,7 @@ Inspect: nanoevolve inspect /tmp/nanoevolve-hello-... <record-id>
 
 ```bash
 nanoevolve best /tmp/nanoevolve-hello-...
+nanoevolve best /tmp/nanoevolve-hello-... --summary
 nanoevolve inspect /tmp/nanoevolve-hello-... <record-id>
 ```
 
@@ -106,6 +107,8 @@ nanoevolve resume my-experiment --iterations 200
 `--target-score` 会在任意成功候选达到目标分数后，于下一个 generation batch 开始前停止。目标值会写入 `run.json` 并由 `resume` 自动复用。使用 `workers > 1` 时，当前 batch 中已经启动的候选仍会完成评估和提交。
 
 `--patience N` 会在连续 `N` 个 generation 都没有产生新的 objective-best record 时停止。失败代仍然消耗一次尝试，因此会计入 patience。该设置会持久化并由 resume 复用；并行运行只会在当前 batch 完整提交后作出停止判断。
+
+`best --summary` 会报告 attempts、成功/失败记录数、完成 generation、已配置的停止参数和推导出的停止原因。添加 `--json` 可获得同时包含 `best` 与 `summary` 的机器可读对象。
 
 ## 最小 Python API
 
@@ -350,7 +353,13 @@ flowchart LR
 - [x] Resume 预检查，避免多余模型调用
 - [x] 并行 batch 边界决策，不提前误停
 
-已发布的 v0.2-v0.6 路线图现已全部实现。未来能力仍需由真实运行中的明确需求驱动；“功能对齐更大的框架”不是目标。
+### v0.7 — 运行证据摘要
+
+- [x] 可选的 `best --summary` 人类可读报告
+- [x] 面向脚本和 dashboard 的 JSON 摘要
+- [x] attempts、成功、失败、generation 和停止原因统计
+
+已发布的 v0.2-v0.7 路线图现已全部实现。未来能力仍需由真实运行中的明确需求驱动；“功能对齐更大的框架”不是目标。
 
 ## 开发与验证
 

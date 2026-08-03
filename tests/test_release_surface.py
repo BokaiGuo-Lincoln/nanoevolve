@@ -36,7 +36,12 @@ class ReleaseCheckTests(unittest.TestCase):
         for filename in ("README.md", "README.zh-CN.md"):
             readme = (ROOT / filename).read_text(encoding="utf-8")
             self.assertIn("--patience", readme)
-            self.assertIn("status-v0.6_stagnation_stopping", readme)
+
+    def test_readmes_surface_run_summaries(self):
+        for filename in ("README.md", "README.zh-CN.md"):
+            readme = (ROOT / filename).read_text(encoding="utf-8")
+            self.assertIn("best --summary", readme)
+            self.assertIn("status-v0.7_run_evidence", readme)
 
     def test_current_repository_passes_static_checks(self):
         self.assertEqual(collect_static_failures(ROOT), [])

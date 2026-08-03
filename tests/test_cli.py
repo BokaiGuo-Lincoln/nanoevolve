@@ -105,6 +105,39 @@ class CliTests(unittest.TestCase):
         self.assertEqual(len(inspected["lineage"]), 2)
         self.assertIn("source", inspected["record"]["artifacts"])
 
+    def test_best_summary_reports_run_evidence(self):
+        _SequenceHandler.responses = [
+            "```python\nSCORE = 1\n```",
+            "not code",
+            "not code",
+        ]
+        code, _, stderr = self.invoke(
+            "run",
+            str(self.project),
+            "--iterations",
+            "10",
+            "--patience",
+            "2",
+            *self.model_arguments(),
+        )
+        self.assertEqual(code, 0, stderr)
+
+        code, stdout, stderr = self.invoke(
+            "best",
+            str(self.project),
+            "--summary",
+            "--json",
+        )
+
+        self.assertEqual(code, 0, stderr)
+        summary = json.loads(stdout)
+        self.assertEqual(summary["best"]["evaluation"]["score"], 1.0)
+        self.assertEqual(summary["summary"]["stop_reason"], "patience_exhausted")
+        self.assertEqual(summary["summary"]["attempts"], 3)
+        self.assertEqual(summary["summary"]["successful"], 2)
+        self.assertEqual(summary["summary"]["failed"], 2)
+        self.assertEqual(summary["summary"]["completed_generation"], 3)
+
     def test_inspect_artifact_prints_the_exact_persisted_content(self):
         _SequenceHandler.responses = ["```python\nSCORE = 2\n```"]
         self.assertEqual(
